@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinSocket_sync_block_server", "WinSocket_sync_block\WinSocket_sync_block.vcxproj", "{5797C4B9-0345-45C5-9320-FDAC568336C2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client", "client\client.vcxproj", "{F866719A-33AD-4515-9261-EB9F18387414}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5797C4B9-0345-45C5-9320-FDAC568336C2}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5797C4B9-0345-45C5-9320-FDAC568336C2}.Debug|Win32.Build.0 = Debug|Win32
+		{5797C4B9-0345-45C5-9320-FDAC568336C2}.Release|Win32.ActiveCfg = Release|Win32
+		{5797C4B9-0345-45C5-9320-FDAC568336C2}.Release|Win32.Build.0 = Release|Win32
+		{F866719A-33AD-4515-9261-EB9F18387414}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F866719A-33AD-4515-9261-EB9F18387414}.Debug|Win32.Build.0 = Debug|Win32
+		{F866719A-33AD-4515-9261-EB9F18387414}.Release|Win32.ActiveCfg = Release|Win32
+		{F866719A-33AD-4515-9261-EB9F18387414}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

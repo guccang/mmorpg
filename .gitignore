@@ -1,0 +1,22 @@
+#
+# runtime data
+#
+bin/
+temp/
+obj/
+Log/
+log/
+Debug/
+Release/
+#
+# personal/runtime data
+#
+*~
+*.[ao]
+*.pdb
+*.rar
+*.zip
+*.txt
+*.config
+*.suo
+*.sdf
