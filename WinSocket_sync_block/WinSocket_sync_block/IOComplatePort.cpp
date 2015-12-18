@@ -34,7 +34,7 @@ void IOComplatePortEx()
 	SYSTEM_INFO systemInfo;
 	HANDLE threads[10];
 
-	WSAEVENT holdEvent = WSACreateEvent();
+	//WSAEVENT holdEvent = WSACreateEvent();
 
 	hCompPort = CreateIoCompletionPort(
 		INVALID_HANDLE_VALUE,
@@ -109,7 +109,7 @@ void IOComplatePortEx()
 		0
 		);
 
-	WaitForSingleObject(holdEvent, INFINITE);
+	//WaitForSingleObject(holdEvent, INFINITE);
 }
 
 void IOComplatePort()
@@ -238,13 +238,16 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 
 		if (perIOData->operationType == ACCEPT_POSTED)
 		{
+		
+
+			// do....
 			int err = setsockopt(perIOData->client,
 				SOL_SOCKET,
 				SO_UPDATE_ACCEPT_CONTEXT,
 				(char *)&perIOData->listen,
 				sizeof(perIOData->listen));
 				
-			printf("error setsockopt posted:%d", WSAGetLastError());
+			printf("error setsockopt posted:%d \n", WSAGetLastError());
 
 			SOCKADDR_IN remote;
 			SOCKADDR_IN local;
@@ -265,7 +268,7 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 
 			if (0 != getpeername(perIOData->client, (SOCKADDR*)&remote, &remoteLen))
 			{
-				printf("getpeername error : %d",WSAGetLastError());
+				printf("getpeername error : %d\n",WSAGetLastError());
 			}
 		
 			LPPER_IO_DATA pid = getPerIOData();
@@ -279,7 +282,6 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 			perIOData->client = client;
 			accept_post(perIOData, 0);
 
-			//send walk
 		}
 
 	}
@@ -338,7 +340,7 @@ void send_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 	INT error = WSASend(perIOData->client, &perIOData->dataBuf, 1, &Bytes, Flags, &(perIOData->overLapped), NULL);
 	if (error != 0 && WSAGetLastError() != WSA_IO_PENDING)
 	{
-		printf("WSASend failed %d", WSAGetLastError());
+		printf("WSASend failed socket=%d error=%d", perIOData->client,WSAGetLastError());
 		clearSession(perIOData);
 	}
 }

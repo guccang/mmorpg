@@ -20,7 +20,7 @@
 
 void NonBlock();
 void Block();
-
+void Update(float t);
 void selectMode();
 
 
@@ -33,6 +33,7 @@ LRESULT CALLBACK MainWndProc(HWND, UINT, WPARAM, LPARAM);
 
 void WSAEventSelectMode();
 const int MAX_CLIENT = 3;// WSA_MAXIMUM_WAIT_EVENTS;
+HANDLE ev[64];
 
 struct session
 {
@@ -52,12 +53,22 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 
+	NonBlock();
+
 	// WinSock Block 
 	//block();
+	DWORD size = 0;
+	HANDLE endEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	ev[size++] = endEvent;
+	ev[size++] = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 	// WinSock NonBlock
-	NonBlock();
-	
+	float t = 0;
+	while (WAIT_OBJECT_0 != WaitForMultipleObjects(size,ev,FALSE,20))
+	{
+		Update(t+=1);
+	}
+
 	// clean
 	if (WSACleanup() == SOCKET_ERROR)
 	{
@@ -67,6 +78,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	return 0;
 }
 
+void Update(float t)
+{
+	//if (t > 200)
+	//	SetEvent(ev[0]);
+	//printf("Update....%f\n",t);
+	ViewList::Update(t);
+}
 /*
 1:·Ç×èÈûÄ£ĞÍ
 select

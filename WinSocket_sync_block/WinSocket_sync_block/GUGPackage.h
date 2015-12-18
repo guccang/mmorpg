@@ -11,6 +11,8 @@ namespace GUGGAME
 		ERROR_NAME_PWD_NULL = 3,
 		ERROR_NOT_ENOUGH_MP = 4,
 		ERROR_FIGHT_TARGET_NULL = 5,
+		ERROR_HAD_REGIST=6,
+		ERROR_FIGHT_TARGET_DEAD = 7,
 	};
 
 	const int HEAD_LEN = 4;
@@ -194,7 +196,7 @@ namespace GUGGAME
 	struct Walk
 	{
 		unsigned int no;
-		short sock;
+		short id;
 		short x;
 		short z;
 		char  dir;
@@ -205,20 +207,20 @@ namespace GUGGAME
 	};
 	template<class T> inline T& operator<<(T& stream, const Walk& data)
 	{
-		stream << data.no << data.sock << data.x << data.z << data.dir;
+		stream << data.no << data.id << data.x << data.z << data.dir;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, Walk& data)
 	{
-		stream >> data.no >> data.sock >> data.x >> data.z >> data.dir;
+		stream >> data.no >> data.id >> data.x >> data.z >> data.dir;
 		return stream;
 	}
 
 	struct Fight
 	{
 		unsigned int no;
-		short attackerID;
-		short targetID;
+		int attackerID;
+		int targetID;
 		short action;
 		Fight()
 		{
@@ -290,7 +292,7 @@ namespace GUGGAME
 	struct CreateObj
 	{
 		unsigned int no;
-		short id;
+		int id;
 		short type;
 		short x;
 		short z;

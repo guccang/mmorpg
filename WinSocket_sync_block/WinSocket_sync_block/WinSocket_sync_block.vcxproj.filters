@@ -57,6 +57,18 @@
     <ClInclude Include="ioTools.h">
       <Filter>源文件</Filter>
     </ClInclude>
+    <ClInclude Include="MapMgr.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObject.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="clientSession.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ServiceNT.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -87,6 +99,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="ioTools.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MapMgr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="clientSession.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ServiceNT.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

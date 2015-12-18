@@ -5,7 +5,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #define random(x) (rand()%x)
-
+#include "MapMgr.h"
 
 void clearStream(LEUD::StreamFix &stream, int seekLen);
 
@@ -73,9 +73,9 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 			{ 
 				Walk w;
 				stream >> w;
-				w.sock = (short)perIOData->client;
+				//w.sock = (short)perIOData->client;
 				SendStruct(perIOData->client,w,1);
-				ViewList::NotifyWalk(w.sock,w.x,w.z,w.dir);
+				ViewList::NotifyWalk(w.id,w.x,w.z,w.dir);
 			}
 			else if (2001 == mssgid)
 			{
@@ -83,17 +83,40 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 				stream >> f;
 				playerData *player = NULL;
 				playerData *target = NULL;
+				masterData *master = NULL;
 				bool bfind = ViewList::find(f.attackerID, &player);
-				bfind = ViewList::find(f.targetID,&target);
 				int errorcode = GUGGAME::OK;
-				if (player != NULL && target != NULL)
+				int targetId = 0;
+				if (MapMgr::isPlayer(f.targetID))
+				{
+					bfind = ViewList::find(f.targetID, &target);
+					if (bfind)
+					{
+						targetId = target->id;
+					}
+				}
+				else
+				{
+					bfind = ViewList::find(f.targetID, &master);
+					if (bfind)
+					{
+						targetId = master->id;
+						if (master->dead > 0)
+						{
+							errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
+						}
+					}
+				}
+
+					
+				if (player != NULL && targetId>0 &&errorcode==GUGGAME::OK)
 				{
 					ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
 
 					if (f.action == 0) // normal
 					{
 						int num = -random(10);
-						ViewList::attrchg(target->id, HP, num);
+						ViewList::attrchg(targetId, HP, num);
 					}
 					else if (f.action == 1) // magic
 					{
@@ -101,7 +124,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 							{
 								int num = -random(50);
 								ViewList::attrchg(player->id, MP, -10);
-								ViewList::attrchg(target->id, HP, num);
+								ViewList::attrchg(targetId, HP, num);
 							}
 							else
 							{
@@ -111,7 +134,8 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 				}
 				else
 				{
-					errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
+					if (errorcode==GUGGAME::OK)
+						errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
 				}
 
 				if (errorcode != GUGGAME::OK)
@@ -128,7 +152,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 				Login lg;
 				stream >> lg;
 				int code = ViewList::add(perIOData->client, 0, 0, 0, (char*)lg.name, (char*)lg.pwd);
-				if( GUGGAME::OK!=code)
+				//if( GUGGAME::OK!=code)
 				{
 					ErrorCode ec;
 					ec.msgid = mssgid;
@@ -141,7 +165,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 				Register lg;
 				stream >> lg;
 				int error = ViewList::regist(lg.name, lg.pwd);
-				if (error != GUGGAME::OK)
+				//if (error != GUGGAME::OK)
 				{
 					ErrorCode ec;
 					ec.msgid = mssgid;

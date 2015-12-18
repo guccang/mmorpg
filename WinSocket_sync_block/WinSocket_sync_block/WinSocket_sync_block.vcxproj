@@ -28,7 +28,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v120_xp</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -82,11 +82,15 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="clientSession.h" />
     <ClInclude Include="criticalSection.h" />
+    <ClInclude Include="GameObject.h" />
     <ClInclude Include="GUGPackage.h" />
     <ClInclude Include="IOComplatePort.h" />
     <ClInclude Include="ioTools.h" />
+    <ClInclude Include="MapMgr.h" />
     <ClInclude Include="overLapped.h" />
+    <ClInclude Include="ServiceNT.h" />
     <ClInclude Include="socketTools.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="stream\StreamBase.h" />
@@ -97,10 +101,14 @@
     <ClInclude Include="viewListTTT.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="clientSession.cpp" />
+    <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GUGPackage.cpp" />
     <ClCompile Include="IOComplatePort.cpp" />
     <ClCompile Include="ioTools.cpp" />
+    <ClCompile Include="MapMgr.cpp" />
     <ClCompile Include="overLapped.cpp" />
+    <ClCompile Include="ServiceNT.cpp" />
     <ClCompile Include="socketTools.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
