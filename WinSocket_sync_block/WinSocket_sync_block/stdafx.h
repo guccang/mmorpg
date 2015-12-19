@@ -9,7 +9,12 @@
 
 #include <stdio.h>
 #include <tchar.h>
-
+#include <WinSock2.h>
+#include <Windows.h>
+#include <MSWSOCK.h>
+#include "criticalSection.h"
+#include "GUCQueue.h"
+using namespace GUGGAME;
 
 
 // TODO:  在此处引用程序需要的其他头文件

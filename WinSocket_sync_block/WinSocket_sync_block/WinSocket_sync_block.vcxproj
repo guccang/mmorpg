@@ -62,7 +62,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -84,7 +84,9 @@
   <ItemGroup>
     <ClInclude Include="clientSession.h" />
     <ClInclude Include="criticalSection.h" />
+    <ClInclude Include="Event.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="GUCQueue.h" />
     <ClInclude Include="GUGPackage.h" />
     <ClInclude Include="IOComplatePort.h" />
     <ClInclude Include="ioTools.h" />

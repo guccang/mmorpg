@@ -64,24 +64,3 @@ bool doBind(SOCKET listenSock, unsigned short port)
 	}
 	return true;
 }
-
-bool bindAndListen(SOCKET &sock, unsigned short port)
-{
-	int error = 0;
-	SOCKET listenSock = getSocket();
-	
-	
-	if (false == doBind(listenSock, 5150))
-	{
-		return false;
-	}
-
-
-	if (false == doListen(listenSock))
-	{
-		return false;
-	}
-
-
-	return true;
-}

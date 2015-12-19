@@ -1,10 +1,10 @@
 #include "stdafx.h"
 #include "TcpReceiver.h"
 #include "viewListTTT.h"
-#include "criticalSection.h"
 #include "GUGPackage.h"
 #include "ioTools.h"
 #include "MapMgr.h"
+#include "Event.h"
 #include<stdio.h>
 #include<stdlib.h>
 #define random(x) (rand()%x)
@@ -17,10 +17,15 @@ enum MAPOBJ
 	MASTER=2,
 };
 
+ViewList::clientQueue ViewList::_tcpClientEventQueue;
+HANDLE ViewList::_clientEvent;
 playerData ViewList::playerArray[100];
 masterData ViewList::masterArray[500];
 hatch ViewList::hatchArray[10];
 CriticalSection ViewList::m_lock;
+float ViewList::fightLen = 2.0f;
+short bornX = 9;
+short bornZ = 9;
 
 hatch::hatch()
 {
@@ -34,7 +39,7 @@ hatch::hatch()
 	_name[0] = 0;
 }
 
-void hatch::init(int id, int x, int z, int radius, int cnt,char *name)
+void hatch::init(int id, short x, short z, int radius, int cnt,char *name)
 {
 	_MapObjectID = id;
 	_x = x;
@@ -44,7 +49,15 @@ void hatch::init(int id, int x, int z, int radius, int cnt,char *name)
 	_flag = 1;
 	strcpy_s(_name, name);
 }
+float calcFightLen()
+{
+	return ViewList::fightLen*ViewList::fightLen * 2;
+}
 
+void ViewList::PushEvent(TCPClientEvent* e)
+{
+	_tcpClientEventQueue.PushEvent(e);
+}
 void ViewList::masterInit()
 {
 	hatchArray[0].init(1, -20, 0, 10, 5,"¥®…£");
@@ -52,6 +65,26 @@ void ViewList::masterInit()
 	hatchArray[2].init(1, 20, 0, 10, 5, "¡˙¡˙");
 	hatchArray[3].init(1, -20, -20, 10, 5, "¡¡¡¡");
 
+}
+
+void QueueTest()
+{
+	queue<eventBase> queue;
+	for (int i = 0; i < 100; ++i)
+	{
+		if (i % 2 == 0)
+			queue.push_back(new eventBase(i));
+		else
+			queue.push_front(new eventBase(i));
+	}
+	eventBase* e;
+	while (e = queue.front())
+	{
+		queue.pop_front();
+		printf("%d ", e->_id);
+		delete e;
+	}
+	printf("pop end %d", (int)queue.empty());
 }
 
 	 void ViewList::Init()
@@ -70,6 +103,8 @@ void ViewList::masterInit()
 		}
 
 		masterInit();
+		_clientEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+		//QueueTest();
 	 }
 
 
@@ -105,7 +140,7 @@ void ViewList::masterInit()
 		 return GUGGAME::OK;
 	 }
 
-	 int ViewList::add(int sock, int x, int z, int dir,const char*name,const char* pwd)
+	 int ViewList::add(int sock, short x, short z, char dir,const char*name,const char* pwd)
 	{
 		CriticalSection::Lock lock(m_lock);
 
@@ -113,7 +148,7 @@ void ViewList::masterInit()
 		bool beGet = find(name, &db);
 		if (false == beGet )
 		{
-			printf("not find or has onLine %s", name);
+			printf("not find or has onLine %s %s", name,pwd);
 			return  GUGGAME::ERROR_LOGIN_NOT_REGIST;;
 		}
 		if (db->onLine==1)
@@ -232,6 +267,38 @@ void ViewList::masterInit()
 		  return false;
 	  }
 
+	  float len(masterData* master,playerData* target)
+	  {
+		  if (master == NULL || target == NULL)
+		  {
+			  printf("calc len failed");
+			  return -1;
+		  }
+		  int x = target->x - master->x;
+		  int z = target->z - master->z;
+		  return float( x*x + z*z);
+	  }
+
+	  bool ViewList::getNearestPlayer(masterData* master,playerData** freeData)
+	  {
+		  *freeData = NULL;
+		  float tmp = 99999999.0f;
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (playerArray[i].onLine == 0) continue;
+			  float theLen = len(master, &playerArray[i]);
+			  if (theLen>0&&tmp > theLen && theLen<=calcFightLen())
+			  {
+				  tmp = theLen;
+				  *freeData = &playerArray[i];
+			  }
+		  }
+
+		  if (*freeData != NULL) return true;
+
+		  return false;
+	  }
+
 	bool ViewList::get(playerData** freeData)
 	{
 		for (int i = 0; i < 100; ++i)
@@ -259,8 +326,9 @@ void ViewList::masterInit()
 	}
 	*/
 
-	void ViewList::NotifyCreate(int id, int type, int x, int z, int dir)
+	void ViewList::NotifyCreate(int id, int type, short x, short z, char dir)
 	{
+		type = type;
 		CriticalSection::Lock lock(m_lock);
 		playerData *p = NULL;
 		bool bfind = false;
@@ -320,25 +388,50 @@ void ViewList::masterInit()
 		NotifyAttrInit(p->id, p->hp, p->mp, p->def);
 	}
 
-	  void ViewList::NotifyWalk(int id,int x,int y,int dir)
+	  void ViewList::NotifyWalk(int id,short x,short y,char dir)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  playerData *p=NULL;
-		  bool bfind = find(id, &p);
-		  if (false == bfind) return;
-		  p->x = x; p->z = y; 
-		  if (dir!=4)
-			p->dir = dir;
-		
+		  masterData *master = NULL;
+		  bool bfind = false;
+		  bool isPlayer = MapMgr::isPlayer(id);
+		  if (isPlayer)
+		  {
+			  bfind = find(id, &p);
+			  if (false == bfind) return;
+			  p->x = x; p->z = y;
+			  if (dir != 4)
+				  p->dir = dir;
+		  }
+		  else
+		  {
+			  bfind = find(id, &master);
+			  if (false == bfind) return;
+			  master->x = x;
+			  master->z = y;
+			  master->dir = dir;
+		  }
+		  
 		  for (int i = 0; i < 100;++i)
 		  {
-			  if (p->id != playerArray[i].id && playerArray[i].onLine==1)
+			  if (playerArray[i].onLine != 1)continue;
+
+			  if (isPlayer&&p->id != playerArray[i].id)
 			  {
 				  Walk w;
 				  w.id = id;
 				  w.x = p->x;
 				  w.z = p->z;
 				  w.dir = p->dir;
+				  SendStruct((SOCKET)playerArray[i].sock, w, 1);
+			  }
+			  else if (!isPlayer)
+			  {
+				  Walk w;
+				  w.id = id;
+				  w.x = master->x;
+				  w.z = master->z;
+				  w.dir = master->dir;
 				  SendStruct((SOCKET)playerArray[i].sock, w, 1);
 			  }
 		  }
@@ -360,7 +453,7 @@ void ViewList::masterInit()
 		  }
 	  }
 
-	  void ViewList::NotifyAttrChg(int id ,short type, short num)
+	  void ViewList::NotifyAttrChg(int id ,int  type, int num)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  //if (MapMgr::isPlayer(id))
@@ -372,8 +465,8 @@ void ViewList::masterInit()
 				  // notify hp chang
 				  AttrChg att;
 				  att.id = id;
-				  att.type = type;
-				  att.num = num;
+				  att.type = (short)type;
+				  att.num = (short)num;
 				  SendStruct(playerArray[i].sock, att, 1);
 			  }
 		  }
@@ -447,7 +540,7 @@ void ViewList::masterInit()
 	  }
 
 
-	  void ViewList::NotifyJump(int id, int x, int z, char dir)
+	  void ViewList::NotifyJump(int id, short x, short z, char dir)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
@@ -491,7 +584,9 @@ void ViewList::masterInit()
 				  player->hp = 1500;
 				  player->mp = 500;
 				  player->def = 100;
-				  NotifyJump(id, 9, 9, 0);
+				  player->x = bornX;
+				  player->z = bornZ;
+				  NotifyJump(id, player->x,player->z, player->dir);
 				  NotifyAttrInit(id, player->hp, player->mp, player->def);
 			  }
 		  }
@@ -533,10 +628,12 @@ void ViewList::masterInit()
 		  master->def = 10; 
 		  master->dir = 0;
 		  master->dead = 0;
-		  master->x = sp->_x+random(radius);
-		  master->z = sp->_z+random(radius);
+		  master->x = sp->_x + (short)random(radius);
+		  master->z = sp->_z+(short)random(radius);
 		  act_2_utf8(sp->_name, 5, master->name, 16);
 		  master->flag = 1;
+		  master->state = 0;
+		  master->target = NULL;
 	  }
 
 	  bool ViewList::get(masterData** freeData)
@@ -552,8 +649,154 @@ void ViewList::masterInit()
 		  return false;
 	  }
 
+	  void walkToTarget(masterData* master)
+	  {
+		  if (master->target == NULL || master->target->onLine == 0)
+		  {
+			  master->target = NULL;
+			  master->state = 0;
+			  return;
+		  }
+
+		  float theLne = len(master, master->target);
+		  if (theLne<calcFightLen())
+		  {
+			  master->state = 2;
+			  return;
+		  }
+
+		  int x = master->target->x - master->x;
+		  int z = master->target->z - master->z;
+
+		  if (x >= ViewList::fightLen)
+		  {
+			  master->x += 1;
+			  master->dir = 0;
+		  }
+		  if (x <= -ViewList::fightLen)
+		  {
+			  master->x -= 1;
+			  master->dir = 1;
+		  }
+		  if (z >= ViewList::fightLen)
+		  {
+			  master->z += 1;
+			  master->dir = 2;
+		  }
+		  if (z <= -ViewList::fightLen)
+		  {
+			  master->z -= 1;
+			  master->dir = 3;
+		  }
+
+		  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
+	  }
+
+	  void AI(masterData* master)
+	  {
+		  if (master->dead>0) return;
+		  char randNum = 0;
+		  switch (master->state)
+		  {
+		  case 0: // stand
+		  {
+			  randNum = random(5);
+			  if (randNum == 0)
+				  master->state = 0;
+			  else if (randNum == 2)
+				  master->state = 2;
+			  else master->state = 1;
+		  }break;
+		  case 1: // walk
+		  {
+			  randNum = random(5);
+			  if (0 == randNum)
+				  master->x += 1;
+			  else if (1 == randNum)
+				  master->x -= 1;
+			  else if (2 == randNum)
+				  master->z -= 1;
+			  else if (3 == randNum)
+				  master->z += 1;
+			  else
+				  master->state = 2;
+
+			  if (randNum<4)
+				ViewList::NotifyWalk(master->id, master->x, master->z, randNum);
+		  }break;
+		  case 2: // fight
+		  {
+			  // find a player
+			  // walk and fight
+			  if (master->target == NULL)
+			  {
+				  playerData* target = NULL;
+				  bool getFinght = ViewList::getNearestPlayer(master, &target);
+				  if (getFinght)
+				  {
+					  master->target = target;
+					  ViewList::NotifyFight(master->id, target->id, 0);
+					  ViewList::attrchg(target->id, HP, -random(100));
+				  }
+				  else
+				  {
+					  master->state = 0;
+				  }
+			  }
+			  else
+			  {
+				  if (master->target->onLine == 0)
+				  {
+					  master->target = NULL;
+					  master->state = 1; // walk
+				  }
+				  else
+				  {
+					  float tmp = len(master, master->target);
+					  if (tmp > 0)
+					  {
+						  if (tmp <=calcFightLen())
+						  {
+							  ViewList::NotifyFight(master->id, master->target->id, 0);
+							  ViewList::attrchg(master->target->id, HP, -random(100));
+						  }
+						  else
+						  {
+							  master->state = 3;
+						  }
+
+					  }
+				  }
+			  }
+		  }break;
+		  case 3:
+		  {
+			  if (master->target == NULL)
+			  {
+				  printf("why master-target is null");
+				  master->state = 0; // stand
+				  master->target = NULL;
+				  break;
+			  }
+			  if (master->target->onLine == 0)
+			  {
+				  master->state = 0; // stand
+				  master->target = NULL;
+				  break;
+			  }
+			  walkToTarget(master);
+		  }break;
+		  default:
+			  break;
+		  }
+	  }
+
+	  
+
 	  void ViewList::Update(float t)
 	  {
+		  _tcpClientEventQueue.OnAccept();
+
 		  for (int i = 0; i < 10; ++i)
 		  {
 			  if (hatchArray[i]._flag == 0) continue;
@@ -577,7 +820,7 @@ void ViewList::masterInit()
 		  else
 		  {
 			  theTime = t;
-
+			  CriticalSection::Lock lock(m_lock);
 			  for (int i = 0; i < 500; ++i)
 			  {
 				  if (masterArray[i].flag != 1) continue;
@@ -594,12 +837,16 @@ void ViewList::masterInit()
 					  NotifyMasterAttrInit(masterArray[i].id);
 					  NotifyJump(masterArray[i].id, masterArray[i].x, masterArray[i].z, 0);
 				  }
-
-				  masterData *master = &masterArray[i];
-				  // AI Fight Moving
-				  // find the player
-				  // fight the palyer
-				  // moving around.
+				  else
+				  {
+					  masterData *master = &masterArray[i];
+					  // AI Fight Moving
+					  // find the player
+					  // fight the palyer
+					  // moving around.
+					  AI(master);
+				  }
+				 
 			  }
 		  }
 		

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "Event.h"
 #include "TcpReceiver.h"
 #include "GUGPackage.h"
 #include "viewListTTT.h"
@@ -7,12 +8,209 @@
 #define random(x) (rand()%x)
 #include "MapMgr.h"
 
-void clearStream(LEUD::StreamFix &stream, int seekLen);
+void clearStream(LEUD::StreamFix &stream,  size_t seekLen);
+
+int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
+{
+	LEUD::StreamFix &stream = *(perIOData->stream);
+	memcpy(stream.m_Buffer + stream.m_WritePos, perIOData->dataBuf.buf, recvLen);
+	stream.m_WritePos += recvLen;
+
+	int msgLen = 0;
+	while ((msgLen = BreakMessage(stream)) > 0)
+	{
+		if ((int)stream.size() >= msgLen)
+		{
+			LEUD::StreamFix *newStream = new LEUD::StreamFix(new char[msgLen], msgLen, msgLen);
+			memcpy(newStream->m_Buffer, stream.m_Buffer, msgLen);
+			stream.m_ReadPos += msgLen;
+			int seekLen = msgLen;
+			clearStream(stream, seekLen);
+
+			// input queue
+			TCPClientEvent *e = new TCPClientEvent(perIOData->client, newStream);
+			ViewList::PushEvent(e);
+		}
+		else
+		{
+			break;
+		}
+	}
+	return 0;
+}
+
+void OnAccept(SOCKET client,LEUD::StreamFix &stream)
+{
+	int msgLen = BreakMessage(stream);
+		if ((int)stream.size() == msgLen)
+		{
+			Head head;
+			stream >> head;
+
+			short  mssgid = (short)BreakMessageID(stream);
+			static int cnt = 0;
+			if (mssgid == 1000)
+			{
+				Pakcage64 pag;
+				stream >> pag;
+				if (1000 != pag.no)
+				{
+					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
+				}
+				//printf("recv num %d:%d:%s\n", ++cnt, pag.no, pag.data);
+				SendStruct(client, pag, 1);
+			}
+			else if (1001 == mssgid)
+			{
+
+				//printf("recv num %d\n", ++cnt);
+				test02 t02;
+				char sss[2];
+				sss[0] = 'a';
+				sss[1] = 'b';
+				try
+				{
+					stream >> t02;
+				}
+				catch (...)
+				{
+					//				 char* buf =	stream.m_Buffer;
+				}
+
+				if (1001 != t02.no)
+				{
+					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
+				}
+				SendStruct(client, t02, 1);
+			}
+			else if (1002 == mssgid)
+			{
+				//printf("recv num %d\n", ++cnt);
+				test03 t03;
+				stream >> t03;
+				if (1002 != t03.no)
+				{
+					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
+				}
+				SendStruct(client, t03, 1);
+			}
+			else if (2000 == mssgid)
+			{
+				Walk w;
+				stream >> w;
+				//w.sock = (short)perIOData->client;
+				SendStruct(client, w, 1);
+				ViewList::NotifyWalk(w.id, w.x, w.z, w.dir);
+			}
+			else if (2001 == mssgid)
+			{
+				Fight f;
+				stream >> f;
+				playerData *player = NULL;
+				playerData *target = NULL;
+				masterData *master = NULL;
+				bool bfind = ViewList::find(f.attackerID, &player);
+				int errorcode = GUGGAME::OK;
+				int targetId = 0;
+				if (MapMgr::isPlayer(f.targetID))
+				{
+					bfind = ViewList::find(f.targetID, &target);
+					if (bfind)
+					{
+						targetId = target->id;
+					}
+				}
+				else
+				{
+					bfind = ViewList::find(f.targetID, &master);
+					if (bfind)
+					{
+						targetId = master->id;
+						if (master->dead > 0)
+						{
+							errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
+						}
+						else
+						{
+							master->target = player;
+						}
+					}
+				}
+
+
+				if (player != NULL && targetId > 0 && errorcode == GUGGAME::OK)
+				{
+					ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+
+					if (f.action == 0) // normal
+					{
+						int num = -random(10);
+						ViewList::attrchg(targetId, HP, num);
+					}
+					else if (f.action == 1) // magic
+					{
+						if (player->mp >= 10)
+						{
+							int num = -random(50);
+							ViewList::attrchg(player->id, MP, -10);
+							ViewList::attrchg(targetId, HP, num);
+						}
+						else
+						{
+							errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
+						}
+					}
+				}
+				else
+				{
+					if (errorcode == GUGGAME::OK)
+						errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
+				}
+
+				if (errorcode != GUGGAME::OK)
+				{
+					ErrorCode ec;
+					ec.msgid = mssgid;
+					ec.errorcode = errorcode;
+					SendStruct(client, ec, 1);
+				}
+
+			}
+			else if (3000 == mssgid)
+			{
+				Login lg;
+				stream >> lg;
+				int code = ViewList::add(client, 0, 0, 0, (char*)lg.name, (char*)lg.pwd);
+				//if( GUGGAME::OK!=code)
+				{
+					ErrorCode ec;
+					ec.msgid = mssgid;
+					ec.errorcode = code;
+					SendStruct(client, ec, 1);
+				}
+			}
+			else if (3001 == mssgid)
+			{
+				Register lg;
+				stream >> lg;
+				int error = ViewList::regist(lg.name, lg.pwd);
+				//if (error != GUGGAME::OK)
+				{
+					ErrorCode ec;
+					ec.msgid = mssgid;
+					ec.errorcode = error;
+					SendStruct(client, ec, 1);
+				}
+			}
+		}
+}
 
 int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 {
-	for (int i = 0; i < recvLen; ++i)
-		stream << (char)perIOData->dataBuf.buf[i];
+	//for (int i = 0; i < recvLen; ++i)
+	//	stream << (char)perIOData->dataBuf.buf[i];
+	memcpy(stream.m_Buffer + stream.m_WritePos, perIOData->dataBuf.buf, recvLen);
+	stream.m_WritePos += recvLen;
 
 	int msgLen = 0;
 	while ((msgLen = BreakMessage(stream)) > 0)
@@ -22,7 +220,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 			Head head;
 			stream >> head;
 
-			unsigned int mssgid = BreakMessageID(stream);
+			 short  mssgid = (short)BreakMessageID(stream);
 			static int cnt = 0;
 			if (mssgid == 1000)
 			{
@@ -49,7 +247,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 				}
 				catch (...)
 				{
-				 char* buf =	stream.m_Buffer;
+//				 char* buf =	stream.m_Buffer;
 				}
 			
 				if (1001 != t02.no)
@@ -104,6 +302,10 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 						if (master->dead > 0)
 						{
 							errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
+						}
+						else
+						{
+							master->target = player;
 						}
 					}
 				}
@@ -184,7 +386,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 	return 0;
 }
 
-void clearStream(LEUD::StreamFix &stream,int seekLen)
+void clearStream(LEUD::StreamFix &stream,size_t seekLen)
 {
 	int offset=0;
 	if (seekLen != stream.m_ReadPos)
@@ -238,7 +440,7 @@ int recvSizeNormal(LPPER_IO_DATA perIOData, int bytesTransferred)
 	Head head;
 	headStream >> head;
 
-	static int cnt = 0;
+	static short cnt = 0;
 	head.len = cnt++;
 	int msgID = 1000;//head.no;
 	switch (msgID)
@@ -257,7 +459,7 @@ int recvSizeNormal(LPPER_IO_DATA perIOData, int bytesTransferred)
 		strcpy_s(send02.sex5, "fmal");
 		stream << send02;
 		static int sendNum = 0, sendNumFailed = 0, recvNum = 0;
-		MakeHeadEx(stream.m_Buffer, stream.size());
+		MakeHeadEx(stream.m_Buffer, (unsigned short)stream.size());
 	//	printf("recv num %d\n", ++recvNum);
 		for (int i = 0; i < 1; ++i)
 		{

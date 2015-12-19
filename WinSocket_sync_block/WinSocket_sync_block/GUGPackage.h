@@ -196,7 +196,7 @@ namespace GUGGAME
 	struct Walk
 	{
 		unsigned int no;
-		short id;
+		int id;
 		short x;
 		short z;
 		char  dir;
@@ -321,7 +321,7 @@ namespace GUGGAME
 	struct DeleteObj
 	{
 		unsigned int no;
-		short id;
+		int id;
 		DeleteObj()
 		{
 			no = 2003;

@@ -194,10 +194,9 @@ void overLappedCallBack()
 
 	*/
 
-	DWORD recvBytes = 0, flags = 0;
+	DWORD  flags = 0;
 	SOCKET listenSocket,acceptSocket;
 
-	char buf[DATA_BUF_SIZE];
 	listenSocket = getSocket();
 	if (false == doBind(listenSocket, SERVER_PORT))
 		return;
@@ -254,6 +253,7 @@ void overLappedCallBack()
 void CALLBACK workerRountine(DWORD dwError,DWORD cbTransfered,LPWSAOVERLAPPED lpOverLapped,DWORD dwFlags)
 {
 	LPOVERLAPPEDDATA overlappedData = (LPOVERLAPPEDDATA)lpOverLapped;
+	dwFlags = dwFlags;
 
 	if (dwError != 0 || cbTransfered == 0)
 	{

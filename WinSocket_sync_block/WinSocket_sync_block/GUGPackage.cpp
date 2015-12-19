@@ -57,7 +57,7 @@ unsigned short FindHeadEx(const char* buf)
 	char bb[4];
 	memcpy(bb, buf, 4);
 	short headlen = *(short*)&bb[0];
-	short len = *(short*)&bb[2];
+//	short len = *(short*)&bb[2];
 	return headlen;
 }
 

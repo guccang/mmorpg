@@ -1,5 +1,9 @@
 #pragma  once
 #include "criticalSection.h"
+ namespace GUGGAME
+{
+	class TCPClientEvent;
+}
 class hatch;
 enum ENUM_ATTR
 {
@@ -12,9 +16,9 @@ struct playerData
 	int onLine;
 	int id;
 	int sock;
-	int x;
-	int z;
-	int dir;
+	short x;
+	short z;
+	char dir;
 	int hp;
 	int mp;
 	int attack;
@@ -28,9 +32,9 @@ struct masterData
 {
 	int id;
 	int spawnid;
-	int x;
-	int z;
-	int dir;
+	short x;
+	short z;
+	char dir;
 	int hp;
 	int mp;
 	int attack;
@@ -38,26 +42,30 @@ struct masterData
 	char name[16];
 	int flag;
 	int dead;
+	int state;
+	playerData* target;
 };
 
 class ViewList
 {
-
+	class GUGGAME::TCPClientEvent;
 public:
+	static float fightLen;
 	static void Init();
 	
 	static int regist(const char* name,const char *pwd);
-	static int add(int sock, int x, int y, int dir,const char*name,const char*pwd);
+	static int add(int sock, short x,short y, char dir,const char*name,const char*pwd);
 	static void remove(int socke);
 	static void attrchg(int id, int type, int num);
-	static void NotifyJump(int id,int x,int y,char dir);
+	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
 	static void NotifyMasterAttrInit(int id);
-	static void NotifyCreate(int id, int type, int x, int y, int dir);
-	static void NotifyWalk(int id,int x,int y,int dir);
+	static void NotifyCreate(int id, int type, short x, short y, char dir);
+	static void NotifyWalk(int id,short x,short y,char dir);
 	static void NotifyFight(int id, int target,short action);
-	static void NotifyAttrChg(int id,short attr, short num);
-	static void NotifyMasterCreate(int id, int x, int y, int dir);
+	static void NotifyAttrChg(int id,int attr, int num);
+	static void NotifyMasterCreate(int id, short x, short y, char dir);
+	static bool getNearestPlayer(masterData* master,playerData** freeData);
 	static bool find(int id, playerData** freeData);
 	static bool get(playerData** freeData);
 	static bool get(masterData** freeData);
@@ -67,12 +75,18 @@ public:
 	static int getSock(int id);
 	static void Update(float t);
 	static void masterInit();
+	static void PushEvent(TCPClientEvent* e);
 	//static bool get(dbData** freeData);
 private:
 	static playerData playerArray[100];
 	static masterData masterArray[500];
 	static CriticalSection m_lock;
 	static hatch hatchArray[10];
+	typedef gugQueue<TCPClientEvent> clientQueue;
+	static clientQueue _tcpClientEventQueue;
+
+public:
+	static HANDLE _clientEvent;
 };
 
 
@@ -82,10 +96,10 @@ class hatch
 {
 public:
 	hatch();
-	void init(int id,int x,int z,int radius,int cnt,char* name);
+	void init(int id,short x,short z,int radius,int cnt,char* name);
 	int _MapObjectID;
-	int _x;
-	int _z;
+	short _x;
+	short _z;
 	int _radius;
 	int _cnt;
 	int _spawnCnt;

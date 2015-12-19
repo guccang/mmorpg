@@ -2,17 +2,25 @@
 #include "MapMgr.h"
 #include <windows.h>
 
-static long PlayerID = 1000;
-static long MasterID = 100000;
+
+enum MAPOBJTYPE
+{
+	PLAYERID = 1000,
+	MASTERID = 100000,
+};
+
+static long PlayerID = PLAYERID;
+static long MasterID = MASTERID;
+
 
 bool MapMgr::isMaster(int id)
 {
-	return id >= MasterID;
+	return id >= MASTERID;
 }
 
 bool MapMgr::isPlayer(int id)
 {
-	return (id > 0 && id <= PlayerID);
+	return (id >= PLAYERID &&id<MASTERID);
 }
 
 int MapMgr::generateID(int type)
@@ -26,4 +34,6 @@ int MapMgr::generateID(int type)
 	{
 		return InterlockedExchangeAdd(&MasterID, 1);
 	}
+
+	return -1;
 }

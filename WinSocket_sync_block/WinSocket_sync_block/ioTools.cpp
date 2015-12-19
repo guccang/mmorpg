@@ -15,11 +15,11 @@ int fileHandle::write(const char* data, int size)
 }
 int fileHandle::size()
 {
-	int temp = is->tellg(); // 记录下当前位置
+	std::streamoff temp = is->tellg(); // 记录下当前位置
 	is->seekg(0, ios_base::end); // 移动到文件尾
-	int len = is->tellg(); // 取得当前位置的指针长度 即文件长度
+	std::streamoff len = is->tellg(); // 取得当前位置的指针长度 即文件长度
 	is->seekg(temp); // 移动到原来的位置
-	return len;
+	return (int)len;
 }
 int fileHandle::read(char** data, int size)
 {

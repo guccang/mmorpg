@@ -8,6 +8,8 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream);
 int recvSizeNormal(LPPER_IO_DATA perIOData, int bytesTransferred);
 unsigned int BreakMessageID(LEUD::StreamFix &stream);
 short BreakMessage(LEUD::StreamFix &stream);
+void OnAccept(SOCKET client, LEUD::StreamFix &stream);
+int recvProcess(LPPER_IO_DATA perIOData, int recvLen);
 
 template<typename T>
 void SendStruct(SOCKET client, const T &sendObj, int Num = 1)
@@ -17,7 +19,7 @@ void SendStruct(SOCKET client, const T &sendObj, int Num = 1)
 	LEUD::StreamFix sendStream(buf, 1024, 0);
 	sendStream << (short)0 << (short)0;
 	sendStream << sendObj;
-	int headerLen = MakeHeadEx(sendStream.m_Buffer, sendStream.size());
+	MakeHeadEx(sendStream.m_Buffer, (unsigned short)sendStream.size());
 
 	static int sendNum = 0, sendNumFailed = 0, recvNum = 0;
 	//printf("recv num %d\n", ++recvNum);

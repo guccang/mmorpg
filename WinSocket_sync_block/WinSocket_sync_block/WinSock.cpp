@@ -43,6 +43,9 @@ struct session
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	argc = argc;
+	argv = argv;
+
 	WSADATA wsaData;
 	int error = 0;
 
@@ -116,7 +119,7 @@ void WSAEventSelectMode()
 	SOCKADDR_IN serverAddr;
 	SOCKET acceptSock, listenSock;
 	DWORD EventTotal = 0;
-	DWORD Index, i;
+	DWORD Index;
 	char buf[1024];
 
 	listenSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -136,13 +139,14 @@ void WSAEventSelectMode()
 	EventArray[EventTotal] = NewEvent;
 	EventTotal++;
 
-	while (true)
+	HANDLE loopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	while (WAIT_OBJECT_0 != WaitForSingleObject(loopEvent,0))
 	{
 		// 等待sock上的event发生
 		Index = WSAWaitForMultipleEvents(EventTotal,EventArray,FALSE,WSA_INFINITE,FALSE);
 		Index -= WSA_WAIT_EVENT_0;
 
-		for (int i = Index; i < EventTotal; ++i)
+		for (DWORD i = Index; i < EventTotal; ++i)
 		{
 			// 查询所有事件
 			Index = WSAWaitForMultipleEvents(1, &EventArray[i], FALSE, 0, FALSE);
@@ -279,7 +283,7 @@ void selectMode()
 
 	int error = -1;
 	SOCKADDR_IN serverAddr;
-	INT nport = 5150;
+	u_short nport = 5150;
 
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
@@ -386,7 +390,7 @@ void block()
 	int error = -1;
 	// address
 	SOCKADDR_IN internetAddr;
-	INT nPort = 5150;
+	u_short nPort = 5150;
 	internetAddr.sin_family = AF_INET;
 	internetAddr.sin_addr.s_addr = INADDR_ANY;
 	internetAddr.sin_port = htons(nPort);
@@ -408,7 +412,7 @@ void block()
 	// accept
 	SOCKADDR_IN clientAddress;
 	int addressLen = sizeof(sockaddr);
-	SOCKET newConnection = -1;
+	SOCKET newConnection = INVALID_SOCKET;
 	int clientNum = 0;
 
 	printf("wait for connect......");
@@ -421,13 +425,15 @@ void block()
 	do
 	{
 		// recv
+
+		HANDLE loopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		char *buf = new char[512];
 		int len = 0;
 		do
 		{
 			len = recv(newConnection, buf, 512, 0);
 			printf("recv:%s\n", buf);
-		} while (0);
+		}while (WAIT_OBJECT_0 != WaitForSingleObject(loopEvent, 0));
 
 		if (len == 0)break;
 
@@ -455,7 +461,7 @@ LRESULT CALLBACK MainWndProc(HWND hDlg, UINT wMsg, WPARAM wParam, LPARAM lParam)
 	DataBuf.buf = buf;
 	int len;
 	DWORD recvLen = 0, flag=0;
-	DWORD sendLen = 0, sendFlag = 0;
+	DWORD  sendFlag = 0;
 	int port;
 	char* addr;
 	sockaddr_in sockAddr;

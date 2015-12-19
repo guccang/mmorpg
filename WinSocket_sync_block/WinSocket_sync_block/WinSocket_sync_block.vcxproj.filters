@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="源文件\base">
+      <UniqueIdentifier>{1d021430-2ef5-43f9-92a0-f2dd03065730}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -68,6 +71,12 @@
     </ClInclude>
     <ClInclude Include="ServiceNT.h">
       <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GUCQueue.h">
+      <Filter>源文件\base</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>源文件\base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

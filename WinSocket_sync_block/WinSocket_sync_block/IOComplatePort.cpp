@@ -21,7 +21,9 @@ void clearSession(LPPER_IO_DATA  perIOData);
 void IOComplatePortEx()
 {
 	ViewList::Init();
-	printf("=========================\nGAME SERVER VERIFY V1.1\n=========================\n");
+	printf("=========================\n");
+	printf("GAME SERVER VERIFY V1.6\n");
+	printf("=========================\n");
 	SOCKET s, sclient;
 	HANDLE hCompPort;
 	LPFN_ACCEPTEX lpfnAcceptEx = NULL;
@@ -30,7 +32,6 @@ void IOComplatePortEx()
 	LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExSockAddrs = NULL;
 
 	DWORD	dwBytees = 0;
-	int buflen = 1024;
 	SYSTEM_INFO systemInfo;
 	HANDLE threads[10];
 
@@ -142,10 +143,10 @@ void IOComplatePort()
 	if (false == doListen(listenSocket, 100))
 		return;
 
-
-	while (true)
+	HANDLE loopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	while (WAIT_OBJECT_0 != WaitForSingleObject(loopEvent,0))
 	{
-		PER_HANDLE_DATA * perHandleData = NULL;
+//		PER_HANDLE_DATA * perHandleData = NULL;
 		SOCKADDR_IN saRemote;
 		SOCKET acceptSocket;
 		int remotelen;
@@ -187,10 +188,9 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 	DWORD bytesTransferred;
 	LPPER_HANDLE_DATA perHandleData;
 	LPPER_IO_DATA perIOData;
-	DWORD flags = 0;
-	int error = 0;
 
-	while (true)
+	HANDLE loopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	while (WAIT_OBJECT_0 != WaitForSingleObject(loopEvent,0))
 	{
 		/*
 		当重叠IO投递事件，完成时（此时数据已经从内核空间到用户空间WSABUF中）.
@@ -247,7 +247,7 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 				(char *)&perIOData->listen,
 				sizeof(perIOData->listen));
 				
-			printf("error setsockopt posted:%d \n", WSAGetLastError());
+			printf("error setsockopt posted:%d %d\n", WSAGetLastError(),err);
 
 			SOCKADDR_IN remote;
 			SOCKADDR_IN local;
@@ -299,7 +299,7 @@ LPPER_IO_DATA getPerIOData()
 
 void accept_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 {
-	printf("accept_post：%d:%d\n",perIOData->listen,perIOData->client);
+	printf("accept_post：%d:%d:%d\n",perIOData->listen,perIOData->client,bytesTransferred);
 
 	CreateIoCompletionPort(
 		(HANDLE)perIOData->client,
@@ -308,7 +308,6 @@ void accept_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 		0
 		);
 
-	DWORD recvBytes = 0;
 	BOOL bRetVal = perIOData->lpfnAcceptEx(
 		perIOData->listen,
 		perIOData->client,
@@ -372,17 +371,18 @@ char * UnicodeToANSI(const wchar_t *str)
 
 void recv_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 {
-	SOCKADDR_IN *addr = (SOCKADDR_IN*)&(perIOData->clientAddr);
+//	SOCKADDR_IN *addr = (SOCKADDR_IN*)&(perIOData->clientAddr);
 	// 
 	if (0 != bytesTransferred)
 	{
 		try
 		{
-			recvSize(perIOData, bytesTransferred, *(perIOData->stream));
+			//recvSize(perIOData, bytesTransferred, *(perIOData->stream));
+			recvProcess(perIOData, bytesTransferred);
 		}
 		catch (...)
 		{
-			printf("exception recvSize.");
+			printf("exception recvSize.\n");
 		}
 
 		//recvSizeNormal(perIOData, bytesTransferred);
