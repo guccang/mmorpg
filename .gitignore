@@ -8,6 +8,7 @@ Log/
 log/
 Debug/
 Release/
+ipch/
 #
 # personal/runtime data
 #
