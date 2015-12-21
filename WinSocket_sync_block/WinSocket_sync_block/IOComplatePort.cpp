@@ -17,7 +17,7 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam);
 LPPER_IO_DATA getPerIOData();
 
 void clearSession(LPPER_IO_DATA  perIOData, int errorCode);
-
+SOCKET acceptSocket = INVALID_SOCKET;
 
 void IOComplatePortEx()
 {
@@ -108,6 +108,7 @@ void IOComplatePortEx()
 		0
 		);
 
+	acceptSocket = perIOData->listen;
 	//WaitForSingleObject(holdEvent, INFINITE);
 }
 
@@ -203,11 +204,13 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 			(LPOVERLAPPED*)&perIOData,
 			INFINITE
 			);
-		if (false == ret)
+		if ( !ret )
 		{
 			int errorCode = WSAGetLastError();
-			printf("GetQueuedCompletionStatus failed %d\n",errorCode);
-			clearSession(perIOData,errorCode);
+			printf("GetQueuedCompletionStatus failed %d : %d\n",errorCode,perIOData->client);
+			//如果是监听线程那么就悲剧了，无法接受连接了。擦擦
+			if (acceptSocket!=perIOData->client) // 非监听端口关闭
+				clearSession(perIOData, errorCode); 
 			continue;
 		}
 

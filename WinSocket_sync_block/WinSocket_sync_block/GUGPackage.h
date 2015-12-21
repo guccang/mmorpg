@@ -222,6 +222,8 @@ namespace GUGGAME
 		int attackerID;
 		int targetID;
 		short action;
+		short parm01;
+		short parm02;
 		Fight()
 		{
 			no = 2001;
@@ -229,12 +231,12 @@ namespace GUGGAME
 	};
 	template<class T> inline T& operator<<(T& stream, const Fight& data)
 	{
-		stream << data.no << data.attackerID << data.targetID << data.action;
+		stream << data.no << data.attackerID << data.targetID << data.action << data.parm01 << data.parm02;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, Fight& data)
 	{
-		stream >> data.no >> data.attackerID >>  data.targetID >>data.action;
+		stream >> data.no >> data.attackerID >>  data.targetID >>data.action >> data.parm01 >> data.parm02;
 		return stream;
 	}
 

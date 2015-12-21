@@ -24,7 +24,7 @@ struct playerData : public mapObj
 {
 	int onLine;
 	int id;
-	int sock;
+	SOCKET sock;
 	short x;
 	short z;
 	char dir;
@@ -43,6 +43,9 @@ struct masterData : public mapObj
 	int spawnid;
 	short x;
 	short z;
+	short bx; // born x ,z
+	short bz;
+	int radius;
 	char dir;
 	int hp;
 	int mp;
@@ -68,8 +71,9 @@ public:
 	
 	static int regist(const char* name,const char *pwd);
 	static int add(int sock, short x,short y, char dir,const char*name,const char*pwd);
-	static void remove(int socke,int errorCode);
+	static void remove(SOCKET socke,int errorCode);
 	static void attrchg(int id, int type, int num);
+	static void attrchgAreo(int* targets, int num, int type, int demage);
 	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
 	static void NotifyMasterAttrInit(int id);
@@ -80,12 +84,13 @@ public:
 	static void NotifyMasterCreate(int id, short x, short y, char dir);
 	static bool getNearestPlayer(masterData* master,playerData** freeData);
 	static bool getNearestMaster(masterData* master, masterData** freeData);
+	static void areoDamage(short x, short z, char radius,int demage,int attackID,short action);
 	static bool find(int id, playerData** freeData);
 	static bool get(playerData** freeData);
 	static bool get(masterData** freeData);
 	static bool find(const char* name, playerData** freeData);
 	static bool find(int id, masterData** freeData);
-	static int getID(int sock);
+	static int getID(SOCKET sock);
 	static int getSock(int id);
 	static void Update(float t);
 	static void masterInit();

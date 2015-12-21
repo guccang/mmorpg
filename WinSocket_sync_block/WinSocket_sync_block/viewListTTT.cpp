@@ -31,13 +31,12 @@ masterData ViewList::masterArray[500];
 hatch ViewList::hatchArray[10];
 CriticalSection ViewList::m_lock;
 float ViewList::fightLen = 2.0f;
-short bornX = 30;
-short bornZ = 30;
+
 short mapSize = 512;
 short mapCoor = (short)(mapSize * 0.5)-1;
 short minCoor = -mapCoor;
 short maxCoor = mapCoor;
-short viewLen = 60;
+short viewLen = 200; // 距离大于viewLen*viewLen的时候就不发送移动包
 
 hatch::hatch()
 {
@@ -81,7 +80,7 @@ void ViewList::PushEvent(TCPClientEvent* e)
 void ViewList::masterInit()
 {
 	hatchArray[0].init(1, -20, 0, 100, 100,"川桑");
-	hatchArray[1].init(2, 0, 0, 100, 100, "暴暴");
+	hatchArray[1].init(2, 0, 0, 20, 100, "暴暴");
 	hatchArray[2].init(3, 20, 0, 100, 100, "龙龙");
 	hatchArray[3].init(4, -20, -20, 100, 100, "亮亮");
 	hatchArray[4].init(5, -10, -10, 100, 100, "小明");
@@ -150,6 +149,11 @@ void QueueTest()
 		 nx  -= mapCoor;
 		 nz  -= mapCoor;
 	 }
+	 void clearMoveFlag(short x, short z)
+	 {
+		 coord(x, z);
+		 ViewList::mapData[x][z] = 0;
+	 }
 	 bool Move(short x, short z,short x1,short z1)
 	 {
 		 if (x == x1&&z == z1) return true;
@@ -204,7 +208,7 @@ void QueueTest()
 	 int ViewList::add(int sock, short x, short z, char dir,const char*name,const char* pwd)
 	{
 		CriticalSection::Lock lock(m_lock);
-
+		
 		playerData *db = NULL;
 		bool beGet = find(name, &db);
 		if (false == beGet )
@@ -260,7 +264,7 @@ void QueueTest()
 		 return 0;
 	 }
 
-	 int ViewList::getID(int sock)
+	 int ViewList::getID(SOCKET sock)
 	 {
 		 for (int i = 0; i < 100; ++i)
 		 {
@@ -269,7 +273,7 @@ void QueueTest()
 		 }
 		 return 0;
 	 }
-	  void ViewList::remove(int socke,int errorCode)
+	  void ViewList::remove(SOCKET socke,int errorCode)
 	{
 		CriticalSection::Lock lock(m_lock);
 		DeleteObj del;
@@ -341,6 +345,13 @@ void QueueTest()
 		  return false;
 	  }
 
+	  float distance(short x, short z, short x1, short z1)
+	  {
+		  int nx = x - x1;
+		  int nz = z - z1;
+		  return float(nx*nx + nz*nz);
+	  }
+
 	  float len(masterData* master, masterData* target)
 	  {
 		  if (master == NULL || target == NULL)
@@ -348,11 +359,10 @@ void QueueTest()
 			  printf("calc len failed");
 			  return -1;
 		  }
-		  int x = target->x - master->x;
-		  int z = target->z - master->z;
-		  return float(x*x + z*z);
+		  return distance(target->x, target->z, master->x, master->z);
 	  }
 
+	  
 	  float len(masterData* master,playerData* target)
 	  {
 		  if (master == NULL || target == NULL)
@@ -360,9 +370,7 @@ void QueueTest()
 			  printf("calc len failed");
 			  return -1;
 		  }
-		  int x = target->x - master->x;
-		  int z = target->z - master->z;
-		  return float( x*x + z*z);
+		  return distance(target->x, target->z, master->x, master->z);
 	  }
 	  bool ViewList::getNearestMaster(masterData* master, masterData** freeData)
 	  {
@@ -662,7 +670,43 @@ void QueueTest()
 		  }
 	  }
 
+	  void ViewList::areoDamage(short x, short z, char radius, int demage,int attackID,short action)
+	  {
+		  CriticalSection::Lock lock(m_lock);
+		  float dis = (float)radius*radius;
+		  int num = 0;
+		  playerData* player = NULL;
+		  bool find = ViewList::find(attackID, &player);
+		  if (!find)
+		  {
+			  printf("areo damage not find player....why....");
+			  return;
+		  }
+		  for (int i = 0; i < 500; ++i)
+		  {
+			  if (masterArray[i].flag != 1 || masterArray[i].dead>0) continue;
+			  if (distance(x, z, masterArray[i].x, masterArray[i].z) <= dis)
+			  {
+				  num++;
+				  masterArray[i].target = player;
+				  NotifyFight(attackID, masterArray[i].id, action);
+				  attrchg(masterArray[i].id, HP, demage);
+			  }
+		  }
+		  printf("master num:%d\n",num);
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (!isOnLine(playerArray[i])) continue;
+			  if (attackID == playerArray[i].id) continue;
 
+			  if (distance(x, z, playerArray[i].x, playerArray[i].z) <= dis)
+			  {
+				  NotifyFight(attackID, playerArray[i].id, action);
+				  attrchg(playerArray[i].id, HP, demage);
+			  }
+		  }
+	  }
+	
 	  void ViewList::attrchg(int id, int type, int num)
 	  {
 		  CriticalSection::Lock lock(m_lock);
@@ -689,10 +733,11 @@ void QueueTest()
 			  if (player->hp <= 0)
 			  {
 				  player->hp = 150000;
-				  player->mp = 5000;
+				  player->mp = 150000;
 				  player->def = 100;
-				  player->x = randomDW(bornX);
-				  player->z = randomDW(bornZ);
+				  clearMoveFlag(player->x, player->z);
+				  player->x = randomDW(10);
+				  player->z = randomDW(10);
 				  NotifyJump(id, player->x,player->z, player->dir);
 				  NotifyAttrInit(id, player->hp, player->mp, player->def);
 			  }
@@ -720,6 +765,7 @@ void QueueTest()
 				  master->mp = 200;
 				  master->def = 50;
 				  master->dead = 1;
+				  clearMoveFlag(master->x, master->z);
 			  }
 		  }
 	  }
@@ -730,6 +776,7 @@ void QueueTest()
 		  master->spawnid = spawnId;
 		  if (master->dead==0)
 			 master->id = MapMgr::generateID(1);
+		  master->radius = radius;
 		  master->hp = 300;
 		  master->mp = 100;
 		  master->def = 10; 
@@ -737,6 +784,8 @@ void QueueTest()
 		  master->dead = 0;
 		  master->x = sp->_x + (short)randomDW(radius);
 		  master->z = sp->_z+(short)randomDW(radius);
+		  master->bx = master->x;
+		  master->bz = master->z;
 		  act_2_utf8(sp->_name, 5, master->name, 16);
 		  master->flag = 1;
 		  master->state = 0;
@@ -897,16 +946,33 @@ void QueueTest()
 		  {
 			  randNum = random(5);
 			  short x = master->x, z=master->z;
-			  if (0 == randNum)
-				 x =  master->x + 1;
-			  else if (1 == randNum)
-				 x = master->x - 1;
-			  else if (2 == randNum)
-				 z = master->z - 1;
-			  else if (3 == randNum)
-				 z = master->z + 1;
+			  short bx = master->bx, bz = master->bz;
+			  float dis = distance(x, z, bx, bz);
+			  short detax=0, detaz=0;
+			  if (dis > master->radius*master->radius)
+			  {
+				  detax = (bx - x)>0?1:-1;
+				  detaz = (bz - z)>0?1:-1;
+			  }
 			  else
-				  master->state = 2;
+			  {
+				 // detax = (x - bx)>0?1:-1;
+				 // detaz = (z - bz)>0?1:-1;
+				  if (0 == randNum)
+					  detax =  1;
+				  else if (1 == randNum)
+					  detax =  -1;
+				  else if (2 == randNum)
+					   detaz =  -1;
+				  else if (3 == randNum)
+					  detaz =  1;
+			  }
+			  x = master->x + detax;
+			  z = master->z + detaz;
+			  /*
+			
+			  */
+			  if (4==randNum) master->state = 2;
 			  
 
 			  if (randNum<4)
@@ -1014,8 +1080,8 @@ void QueueTest()
 	  void ViewList::Update(float t)
 	  {
 		
-			  _iocpEventQueue.OnAccept((void*)&playerArray);
-			  _tcpClientEventQueue.OnAccept((void*)&playerArray);
+		  _iocpEventQueue.OnAccept((void*)&playerArray);
+		  _tcpClientEventQueue.OnAccept((void*)&playerArray);
 	
 	
 		  for (int i = 0; i < 10; ++i)
@@ -1036,7 +1102,7 @@ void QueueTest()
 		  }
 
 		  static float theTime = t;
-		  if (t - theTime < 5)
+		  if (t - theTime < 7)
 		  {
 		  }
 		  else

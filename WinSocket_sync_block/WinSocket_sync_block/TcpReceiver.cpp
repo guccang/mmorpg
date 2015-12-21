@@ -8,6 +8,9 @@
 #define random(x) (rand()%x)
 #include "MapMgr.h"
 
+short bornX = 64;
+short bornZ = 38;
+
 void clearStream(LEUD::StreamFix &stream,  size_t seekLen);
 
 int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
@@ -37,6 +40,133 @@ int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
 		}
 	}
 	return 0;
+}
+
+void SkillUse(SOCKET client,Fight &f)
+{
+	playerData *player = NULL;
+	playerData *target = NULL;
+	masterData *master = NULL;
+	bool bfind = ViewList::find(f.attackerID, &player);
+	int errorcode = GUGGAME::OK;
+	int targetId = 0;
+	if (MapMgr::isPlayer(f.targetID))
+	{
+		bfind = ViewList::find(f.targetID, &target);
+		if (bfind)
+		{
+			targetId = target->id;
+		}
+	}
+	else
+	{
+		bfind = ViewList::find(f.targetID, &master);
+		if (bfind)
+		{
+			targetId = master->id;
+			if (master->dead > 0)
+			{
+				errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
+			}
+			else
+			{
+				master->target = player;
+			}
+		}
+	}
+
+
+	if (player != NULL && (targetId > 0||f.action==3) && errorcode == GUGGAME::OK)
+	{
+
+		if (f.action == 0) // normal
+		{
+			ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+
+			int num = -random(10);
+			ViewList::attrchg(targetId, HP, num);
+		}
+		else if (f.action == 1) // magic
+		{
+			if (player->mp >= 10)
+			{
+				int num = -random(50);
+				ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+				ViewList::attrchg(player->id, MP, -10);
+				ViewList::attrchg(targetId, HP, num);
+			}
+			else
+			{
+				errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
+			}
+		}
+		else if (f.action == 2) // areo magic
+		{
+			if (player->mp <= 30)
+			{
+				errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
+			}
+			else
+			{
+				if (MapMgr::isMaster(targetId)) // select master
+				{
+					if (master == NULL)
+					{
+						printf("master is null why.....not fix error!");
+					}
+					else
+					{
+						short areoX = master->x;
+						short areoZ = master->z;
+						char radius = 9;
+						int num = -random(100);
+						ViewList::attrchg(f.attackerID, MP, -30);
+						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+					}
+				}
+				else if (MapMgr::isPlayer(targetId)) // select player/self
+				{
+					playerData* targetPlayer = NULL;
+					bfind = ViewList::find(f.targetID, &targetPlayer);
+					if (bfind)
+					{
+						short areoX = targetPlayer->x;
+						short areoZ = targetPlayer->z;
+						char radius = 9;
+						int num = -random(200);
+						ViewList::attrchg(f.attackerID, MP, -30);
+						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+					}
+					else
+					{
+						printf("select player not find why.... fixe it \n");
+					}
+				}
+			}
+		}
+		else if (3 == f.action)
+		{
+			short areoX = f.parm01;
+			short areoZ = f.parm02;
+			char radius = 9;
+			int num = -random(200);
+			ViewList::attrchg(f.attackerID, MP, -30);
+			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+		}
+	}
+	else
+	{
+		if (errorcode == GUGGAME::OK)
+			errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
+	}
+
+	if (errorcode != GUGGAME::OK)
+	{
+		ErrorCode ec;
+		ec.msgid = (short)f.no;
+		ec.errorcode = errorcode;
+		SendStruct(client, ec, 1);
+	}
 }
 
 void OnAccept(SOCKET client,LEUD::StreamFix &stream)
@@ -111,74 +241,7 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 			{
 				Fight f;
 				stream >> f;
-				playerData *player = NULL;
-				playerData *target = NULL;
-				masterData *master = NULL;
-				bool bfind = ViewList::find(f.attackerID, &player);
-				int errorcode = GUGGAME::OK;
-				int targetId = 0;
-				if (MapMgr::isPlayer(f.targetID))
-				{
-					bfind = ViewList::find(f.targetID, &target);
-					if (bfind)
-					{
-						targetId = target->id;
-					}
-				}
-				else
-				{
-					bfind = ViewList::find(f.targetID, &master);
-					if (bfind)
-					{
-						targetId = master->id;
-						if (master->dead > 0)
-						{
-							errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
-						}
-						else
-						{
-							master->target = player;
-						}
-					}
-				}
-
-
-				if (player != NULL && targetId > 0 && errorcode == GUGGAME::OK)
-				{
-					ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
-
-					if (f.action == 0) // normal
-					{
-						int num = -random(10);
-						ViewList::attrchg(targetId, HP, num);
-					}
-					else if (f.action == 1) // magic
-					{
-						if (player->mp >= 10)
-						{
-							int num = -random(50);
-							ViewList::attrchg(player->id, MP, -10);
-							ViewList::attrchg(targetId, HP, num);
-						}
-						else
-						{
-							errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
-						}
-					}
-				}
-				else
-				{
-					if (errorcode == GUGGAME::OK)
-						errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
-				}
-
-				if (errorcode != GUGGAME::OK)
-				{
-					ErrorCode ec;
-					ec.msgid = mssgid;
-					ec.errorcode = errorcode;
-					SendStruct(client, ec, 1);
-				}
+				SkillUse(client, f);
 
 			}
 			else if (3000 == mssgid)
@@ -358,7 +421,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 			{
 				Login lg;
 				stream >> lg;
-				int code = ViewList::add(perIOData->client, 0, 0, 0, (char*)lg.name, (char*)lg.pwd);
+				int code = ViewList::add(perIOData->client, bornX,bornZ, 0, (char*)lg.name, (char*)lg.pwd);
 				//if( GUGGAME::OK!=code)
 				{
 					ErrorCode ec;

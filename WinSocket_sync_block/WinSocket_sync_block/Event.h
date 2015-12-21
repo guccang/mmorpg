@@ -15,6 +15,7 @@ namespace GUGGAME
 		virtual void OnAccept(void* params)
 		{
 			// do something
+			params = params;
 		}
 	};
 
@@ -45,6 +46,7 @@ namespace GUGGAME
 		}
 		void OnAccept(void* params)
 		{
+			params = params;
 			// do something
 			::OnAccept(_client,*_stream);
 		}
@@ -63,6 +65,7 @@ namespace GUGGAME
 		int _errorCode;
 		void OnAccept(void* params)
 		{
+			params = params;
 			if (_errorCode == WSAENOTSOCK)
 			{
 				ViewList::remove(_socket,_errorCode);
