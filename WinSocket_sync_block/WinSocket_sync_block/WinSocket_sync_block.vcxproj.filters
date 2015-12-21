@@ -78,6 +78,9 @@
     <ClInclude Include="Event.h">
       <Filter>源文件\base</Filter>
     </ClInclude>
+    <ClInclude Include="AStart.h">
+      <Filter>源文件\base</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

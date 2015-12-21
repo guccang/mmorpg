@@ -88,7 +88,7 @@ namespace GUGGAME
 			CriticalSection::Lock lock(_cs);
 			_cur->push_back(e);
 		}
-		void OnAccept()
+		void OnAccept(void* params)
 		{
 			{
 				CriticalSection::Lock lock(_cs);
@@ -108,7 +108,7 @@ namespace GUGGAME
 			while (e = _proc->front())
 			{
 				_proc->pop_front();
-				e->OnAccept();
+				e->OnAccept(params);
 				delete e;
 				e = NULL;
 			}

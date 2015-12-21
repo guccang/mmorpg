@@ -12,11 +12,16 @@ namespace GUGGAME
 		{
 			_id = id;
 		}
+		virtual void OnAccept(void* params)
+		{
+			// do something
+		}
 	};
 
 	enum EVENT_ID
 	{
 		EVENTID_TCPClientEvent,
+		EVENTID_IOCPEvent,
 	};
 
 	class TCPClientEvent : public eventBase
@@ -38,10 +43,34 @@ namespace GUGGAME
 				delete _stream;
 			}
 		}
-		void OnAccept()
+		void OnAccept(void* params)
 		{
 			// do something
 			::OnAccept(_client,*_stream);
+		}
+	};
+
+	class IOCPEvent : public eventBase
+	{
+	public :
+		IOCPEvent(SOCKET socket, int errorCode)
+			:eventBase(EVENTID_IOCPEvent)
+		{
+			_socket = socket;
+			_errorCode = errorCode;
+		}
+		SOCKET _socket;
+		int _errorCode;
+		void OnAccept(void* params)
+		{
+			if (_errorCode == WSAENOTSOCK)
+			{
+				ViewList::remove(_socket,_errorCode);
+			}
+			else if (_errorCode == WSAECONNABORTED)
+			{
+				ViewList::remove(_socket,_errorCode);
+			}
 		}
 	};
 }

@@ -8,6 +8,7 @@
 #include "TcpReceiver.h"
 #include "viewListTTT.h"
 #include "ioTools.h"
+#include "Event.h"
 
 using namespace GUGGAME;
 
@@ -15,15 +16,12 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam);
 
 LPPER_IO_DATA getPerIOData();
 
-void clearSession(LPPER_IO_DATA  perIOData);
+void clearSession(LPPER_IO_DATA  perIOData, int errorCode);
 
 
 void IOComplatePortEx()
 {
 	ViewList::Init();
-	printf("=========================\n");
-	printf("GAME SERVER VERIFY V1.6\n");
-	printf("=========================\n");
 	SOCKET s, sclient;
 	HANDLE hCompPort;
 	LPFN_ACCEPTEX lpfnAcceptEx = NULL;
@@ -207,8 +205,9 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 			);
 		if (false == ret)
 		{
-			printf("GetQueuedCompletionStatus failed %d\n",WSAGetLastError());
-			clearSession(perIOData);
+			int errorCode = WSAGetLastError();
+			printf("GetQueuedCompletionStatus failed %d\n",errorCode);
+			clearSession(perIOData,errorCode);
 			continue;
 		}
 
@@ -217,7 +216,7 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 			perIOData->operationType == SEND_POSTED))
 		{
 			printf("client closed %d\n", perIOData->client);
-			clearSession(perIOData);
+			clearSession(perIOData,0);
 			continue;
 		}
 
@@ -339,8 +338,9 @@ void send_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 	INT error = WSASend(perIOData->client, &perIOData->dataBuf, 1, &Bytes, Flags, &(perIOData->overLapped), NULL);
 	if (error != 0 && WSAGetLastError() != WSA_IO_PENDING)
 	{
-		printf("WSASend failed socket=%d error=%d", perIOData->client,WSAGetLastError());
-		clearSession(perIOData);
+		int errorCode = WSAGetLastError();
+		//printf("WSASend failed socket=%d error=%d", perIOData->client,errorCode);
+		clearSession(perIOData,errorCode);
 	}
 }
 
@@ -407,14 +407,16 @@ void recv_post(LPPER_IO_DATA perIOData, DWORD bytesTransferred)
 		NULL);
 	if (error != 0 && WSAGetLastError() != WSA_IO_PENDING)
 	{
-		printf("WSARecv error %d", WSAGetLastError());
-		clearSession(perIOData);
+		int errorCode = WSAGetLastError();
+		printf("WSARecv error %d", errorCode);
+		clearSession(perIOData,errorCode);
 	}
 }
 
-void clearSession(LPPER_IO_DATA  perIOData)
+void clearSession(LPPER_IO_DATA  perIOData,int errorCode)
 {
-	ViewList::remove((short)perIOData->client);
+	IOCPEvent *e = new IOCPEvent(perIOData->client,errorCode);
+	ViewList::PushEvent(e);
 	closesocket(perIOData->client);
 	//GlobalFree(perHandleData);
 	GlobalFree(perIOData);

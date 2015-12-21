@@ -1,17 +1,26 @@
 #pragma  once
 #include "criticalSection.h"
  namespace GUGGAME
-{
-	class TCPClientEvent;
-}
+ {
+	 class TCPClientEvent;
+	 class IOCPEvent;
+	 struct pathNode
+	 {
+		 short x;
+		 short z;
+	 };
+ }
 class hatch;
 enum ENUM_ATTR
 {
 	HP = 0,
 	MP = 1,
 };
+class mapObj
+{
 
-struct playerData
+};
+struct playerData : public mapObj
 {
 	int onLine;
 	int id;
@@ -28,7 +37,7 @@ struct playerData
 	int flag; // 1 use
 };
 
-struct masterData
+struct masterData : public mapObj
 {
 	int id;
 	int spawnid;
@@ -44,6 +53,10 @@ struct masterData
 	int dead;
 	int state;
 	playerData* target;
+	int blockcnt;
+	int astart;
+	pathNode path[50];
+	int pathNum;
 };
 
 class ViewList
@@ -55,7 +68,7 @@ public:
 	
 	static int regist(const char* name,const char *pwd);
 	static int add(int sock, short x,short y, char dir,const char*name,const char*pwd);
-	static void remove(int socke);
+	static void remove(int socke,int errorCode);
 	static void attrchg(int id, int type, int num);
 	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
@@ -66,6 +79,7 @@ public:
 	static void NotifyAttrChg(int id,int attr, int num);
 	static void NotifyMasterCreate(int id, short x, short y, char dir);
 	static bool getNearestPlayer(masterData* master,playerData** freeData);
+	static bool getNearestMaster(masterData* master, masterData** freeData);
 	static bool find(int id, playerData** freeData);
 	static bool get(playerData** freeData);
 	static bool get(masterData** freeData);
@@ -75,15 +89,20 @@ public:
 	static int getSock(int id);
 	static void Update(float t);
 	static void masterInit();
+	static bool check(SOCKET socket);
 	static void PushEvent(TCPClientEvent* e);
+	static void PushEvent(IOCPEvent* e);
 	//static bool get(dbData** freeData);
+	static char mapData[512][512];
 private:
 	static playerData playerArray[100];
 	static masterData masterArray[500];
 	static CriticalSection m_lock;
 	static hatch hatchArray[10];
 	typedef gugQueue<TCPClientEvent> clientQueue;
+	typedef gugQueue<IOCPEvent> iocpQueue;
 	static clientQueue _tcpClientEventQueue;
+	static iocpQueue _iocpEventQueue;
 
 public:
 	static HANDLE _clientEvent;

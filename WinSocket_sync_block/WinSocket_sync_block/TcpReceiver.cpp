@@ -1,8 +1,8 @@
 #include "stdafx.h"
-#include "Event.h"
 #include "TcpReceiver.h"
 #include "GUGPackage.h"
 #include "viewListTTT.h"
+#include "Event.h"
 #include<stdio.h>
 #include<stdlib.h>
 #define random(x) (rand()%x)
@@ -49,6 +49,11 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 
 			short  mssgid = (short)BreakMessageID(stream);
 			static int cnt = 0;
+			if (mssgid != 3001 && mssgid != 3000)
+			{
+				if (!ViewList::check(client))
+					return;
+			}
 			if (mssgid == 1000)
 			{
 				Pakcage64 pag;

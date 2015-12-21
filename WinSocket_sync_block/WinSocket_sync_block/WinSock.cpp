@@ -17,7 +17,7 @@
 #include "overLapped.h"
 #include "IOComplatePort.h"
 #include "viewListTTT.h"
-
+#include <exception>
 void NonBlock();
 void Block();
 void Update(float t);
@@ -43,6 +43,10 @@ struct session
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	printf("=========================\n");
+	printf("GAME SERVER VERIFY V1.8\n");
+	printf("=========================\n");
+
 	argc = argc;
 	argv = argv;
 
@@ -86,7 +90,14 @@ void Update(float t)
 	//if (t > 200)
 	//	SetEvent(ev[0]);
 	//printf("Update....%f\n",t);
-	ViewList::Update(t);
+	try
+	{
+		ViewList::Update(t);
+	}
+	catch (...)
+	{
+		printf("not fixed memroy exception:");
+	}
 }
 /*
 1:·Ç×èÈûÄ£ÐÍ

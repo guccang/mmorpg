@@ -7,7 +7,11 @@
 #include "Event.h"
 #include<stdio.h>
 #include<stdlib.h>
+
+#include "AStart.h"
+#define randomDW(x) (-rand()%x + (short)(x*0.5))
 #define random(x) (rand()%x)
+
 using namespace GUGGAME;
 void act_2_utf8(const char* src, size_t src_len, char* des, size_t des_len);
 enum MAPOBJ
@@ -17,15 +21,23 @@ enum MAPOBJ
 	MASTER=2,
 };
 
+
+char ViewList::mapData[512][512];
 ViewList::clientQueue ViewList::_tcpClientEventQueue;
+ViewList::iocpQueue	ViewList::_iocpEventQueue;
 HANDLE ViewList::_clientEvent;
 playerData ViewList::playerArray[100];
 masterData ViewList::masterArray[500];
 hatch ViewList::hatchArray[10];
 CriticalSection ViewList::m_lock;
 float ViewList::fightLen = 2.0f;
-short bornX = 9;
-short bornZ = 9;
+short bornX = 30;
+short bornZ = 30;
+short mapSize = 512;
+short mapCoor = (short)(mapSize * 0.5)-1;
+short minCoor = -mapCoor;
+short maxCoor = mapCoor;
+short viewLen = 60;
 
 hatch::hatch()
 {
@@ -37,6 +49,11 @@ hatch::hatch()
 	_spawnCnt = 0;
 	_flag = 0;
 	_name[0] = 0;
+}
+
+bool isOnLine(playerData &player)
+{
+	return player.onLine == 1;
 }
 
 void hatch::init(int id, short x, short z, int radius, int cnt,char *name)
@@ -53,18 +70,21 @@ float calcFightLen()
 {
 	return ViewList::fightLen*ViewList::fightLen * 2;
 }
-
+void ViewList::PushEvent(IOCPEvent* e)
+{
+	_iocpEventQueue.PushEvent(e);
+}
 void ViewList::PushEvent(TCPClientEvent* e)
 {
 	_tcpClientEventQueue.PushEvent(e);
 }
 void ViewList::masterInit()
 {
-	hatchArray[0].init(1, -20, 0, 10, 5,"川桑");
-	hatchArray[1].init(1, 0, 0, 10, 5, "暴暴");
-	hatchArray[2].init(1, 20, 0, 10, 5, "龙龙");
-	hatchArray[3].init(1, -20, -20, 10, 5, "亮亮");
-
+	hatchArray[0].init(1, -20, 0, 100, 100,"川桑");
+	hatchArray[1].init(2, 0, 0, 100, 100, "暴暴");
+	hatchArray[2].init(3, 20, 0, 100, 100, "龙龙");
+	hatchArray[3].init(4, -20, -20, 100, 100, "亮亮");
+	hatchArray[4].init(5, -10, -10, 100, 100, "小明");
 }
 
 void QueueTest()
@@ -81,16 +101,17 @@ void QueueTest()
 	while (e = queue.front())
 	{
 		queue.pop_front();
-		printf("%d ", e->_id);
+		//printf("%d ", e->_id);
 		delete e;
 	}
-	printf("pop end %d", (int)queue.empty());
+	//printf("pop end %d", (int)queue.empty());
 }
 
 	 void ViewList::Init()
 	{
 		CriticalSection::Lock lock(m_lock);
 		ZeroMemory(playerArray, sizeof(playerData) * 100);
+		ZeroMemory(mapData, sizeof(char) * mapSize * mapSize);
 		playerData *db = NULL;
 		fileHandle f;
 		int len = f.size();
@@ -107,6 +128,46 @@ void QueueTest()
 		//QueueTest();
 	 }
 
+	 bool canMove(int x, int z)
+	 {
+		 return ViewList::mapData[x][z] == 0;
+	 }
+
+	 short clampMap(short x)
+	 {
+		 if (x < minCoor) x = minCoor;
+		 if (x > maxCoor) x = maxCoor;
+		 return x+mapCoor;
+	 }
+
+	 void coord(short &nx,short &nz)
+	 {
+		 nx = clampMap(nx);
+		 nz = clampMap(nz);
+	 }
+	 void deCoord(short &nx, short &nz)
+	 {
+		 nx  -= mapCoor;
+		 nz  -= mapCoor;
+	 }
+	 bool Move(short x, short z,short x1,short z1)
+	 {
+		 if (x == x1&&z == z1) return true;
+		 coord(x, z);
+		 coord(x1, z1);
+		 if (canMove(x1, z1))
+		 {
+			 ViewList::mapData[x][z] = 0;
+			 ViewList::mapData[x1][z1] = 1;
+			 //printf("(%d,%d)=(%d,%d)\n",x,z, x1, z1);
+			 return true;
+		 }
+		 else
+		 {
+			
+		 }
+		 return false;
+	 }
 
 	 int ViewList::regist(const char* name, const char *pwd)
 	 {
@@ -151,7 +212,7 @@ void QueueTest()
 			printf("not find or has onLine %s %s", name,pwd);
 			return  GUGGAME::ERROR_LOGIN_NOT_REGIST;;
 		}
-		if (db->onLine==1)
+		if (isOnLine(*db))
 		{
 			return GUGGAME::ERROR_LOGIN_ONLINE;
 		}
@@ -208,23 +269,36 @@ void QueueTest()
 		 }
 		 return 0;
 	 }
-	  void ViewList::remove(int socke)
+	  void ViewList::remove(int socke,int errorCode)
 	{
 		CriticalSection::Lock lock(m_lock);
 		DeleteObj del;
 		del.id = getID(socke);
+		if (errorCode == WSAENOTSOCK)
+		{
+		}
+		else if (errorCode == WSAECONNABORTED)
+		{
+		}
+		else
+		{
+			// TODO Fixe
+			printf("why... fixed this please.");
+			return;
+		}
+
 		for (int i = 0; i < 100; ++i)
 		{
+			if (!isOnLine(playerArray[i])) continue;;
+
 			if (playerArray[i].sock == socke)
 			{
 				playerArray[i].onLine = 0;
+				playerArray[i].sock = INVALID_SOCKET;
 			}
 			else
 			{
-				if (playerArray[i].onLine == 1)
-				{
-					SendStruct((SOCKET)playerArray[i].sock,del,1);
-				}
+				SendStruct((SOCKET)playerArray[i].sock,del,1);
 			}
 		}
 	}
@@ -267,6 +341,18 @@ void QueueTest()
 		  return false;
 	  }
 
+	  float len(masterData* master, masterData* target)
+	  {
+		  if (master == NULL || target == NULL)
+		  {
+			  printf("calc len failed");
+			  return -1;
+		  }
+		  int x = target->x - master->x;
+		  int z = target->z - master->z;
+		  return float(x*x + z*z);
+	  }
+
 	  float len(masterData* master,playerData* target)
 	  {
 		  if (master == NULL || target == NULL)
@@ -278,14 +364,32 @@ void QueueTest()
 		  int z = target->z - master->z;
 		  return float( x*x + z*z);
 	  }
+	  bool ViewList::getNearestMaster(masterData* master, masterData** freeData)
+	  {
+		  *freeData = NULL;
+		  float tmp = 99999999.0f;
+		  for (int i = 0; i < 500; ++i)
+		  {
+			  if (masterArray[i].flag == 0 || masterArray[i].dead>0) continue;
+			  float theLen = len(master, &masterArray[i]);
+			  if (theLen>0 && tmp > theLen && theLen <= calcFightLen())
+			  {
+				  tmp = theLen;
+				  *freeData = &masterArray[i];
+			  }
+		  }
 
+		  if (*freeData != NULL) return true;
+
+		  return false;
+	  }
 	  bool ViewList::getNearestPlayer(masterData* master,playerData** freeData)
 	  {
 		  *freeData = NULL;
 		  float tmp = 99999999.0f;
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (playerArray[i].onLine == 0) continue;
+			  if (!isOnLine(playerArray[i])) continue;
 			  float theLen = len(master, &playerArray[i]);
 			  if (theLen>0&&tmp > theLen && theLen<=calcFightLen())
 			  {
@@ -337,7 +441,7 @@ void QueueTest()
 		
 		for (int i = 0; i < 100; ++i)
 		{
-			if (playerArray[i].onLine == 0) continue;
+			if (!isOnLine(playerArray[i])) continue;
 
 			// newplayer to other
 			if (p->id != playerArray[i].id)
@@ -356,7 +460,7 @@ void QueueTest()
 
 		for (int i = 0; i < 100; ++i)
 		{
-			if (playerArray[i].onLine==0 || playerArray[i].id==id) continue;
+			if (!isOnLine(playerArray[i]) || playerArray[i].id == id) continue;
 
 			// other player to new Player
 			CreateObj cc;
@@ -414,7 +518,7 @@ void QueueTest()
 		  
 		  for (int i = 0; i < 100;++i)
 		  {
-			  if (playerArray[i].onLine != 1)continue;
+			  if (!isOnLine(playerArray[i]))continue;
 
 			  if (isPlayer&&p->id != playerArray[i].id)
 			  {
@@ -427,6 +531,8 @@ void QueueTest()
 			  }
 			  else if (!isPlayer)
 			  {
+				  if (len(master, &playerArray[i])>viewLen*viewLen)
+					  continue;
 				  Walk w;
 				  w.id = id;
 				  w.x = master->x;
@@ -442,7 +548,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (playerArray[i].onLine == 1)
+			  if (isOnLine(playerArray[i]))
 			  {
 				  Fight f;
 				  f.attackerID = attack;
@@ -460,7 +566,7 @@ void QueueTest()
 		  {
 			  for (int i = 0; i < 100; ++i)
 			  {
-				  if (playerArray[i].onLine == 0) continue;
+				  if (!isOnLine(playerArray[i])) continue;
 
 				  // notify hp chang
 				  AttrChg att;
@@ -478,13 +584,14 @@ void QueueTest()
 
 	  void ViewList::NotifyMasterAttrInit(int id)
 	  {
+		  CriticalSection::Lock lock(m_lock);
 		  masterData* master = NULL;
 		  bool bFind = find(id, &master);
 		  if (false == bFind) return;
 
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (playerArray[i].onLine==0) continue;
+			  if (!isOnLine(playerArray[i])) continue;
 
 			  Attr att;
 			  att.id = id;
@@ -500,7 +607,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (playerArray[i].onLine == 0 ) continue;
+			  if (!isOnLine(playerArray[i])) continue;
 
 			  // notify self hp chang
 			  Attr att;
@@ -514,7 +621,7 @@ void QueueTest()
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  // notify other to you
-			  if (playerArray[i].onLine == 0) continue;
+			  if (!isOnLine(playerArray[i])) continue;
 			  if (playerArray[i].id == id) continue;
 
 			  Attr att;
@@ -545,7 +652,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (playerArray[i].onLine == 0) continue;
+			  if (!isOnLine(playerArray[i])) continue;
 			  JumpInMap jim;
 			  jim.id = id;
 			  jim.x = x;
@@ -581,11 +688,11 @@ void QueueTest()
 
 			  if (player->hp <= 0)
 			  {
-				  player->hp = 1500;
-				  player->mp = 500;
+				  player->hp = 150000;
+				  player->mp = 5000;
 				  player->def = 100;
-				  player->x = bornX;
-				  player->z = bornZ;
+				  player->x = randomDW(bornX);
+				  player->z = randomDW(bornZ);
 				  NotifyJump(id, player->x,player->z, player->dir);
 				  NotifyAttrInit(id, player->hp, player->mp, player->def);
 			  }
@@ -628,12 +735,15 @@ void QueueTest()
 		  master->def = 10; 
 		  master->dir = 0;
 		  master->dead = 0;
-		  master->x = sp->_x + (short)random(radius);
-		  master->z = sp->_z+(short)random(radius);
+		  master->x = sp->_x + (short)randomDW(radius);
+		  master->z = sp->_z+(short)randomDW(radius);
 		  act_2_utf8(sp->_name, 5, master->name, 16);
 		  master->flag = 1;
 		  master->state = 0;
 		  master->target = NULL;
+		  master->blockcnt = 0;
+		  master->astart = 0;
+		  master->pathNum = 0;
 	  }
 
 	  bool ViewList::get(masterData** freeData)
@@ -648,10 +758,16 @@ void QueueTest()
 		  }
 		  return false;
 	  }
-
+	  void resetMaster(masterData* master)
+	  {
+		  master->blockcnt = 0;
+		  master->astart = 0;
+		  master->pathNum = 0;
+		 // master->target = NULL;
+	  }
 	  void walkToTarget(masterData* master)
 	  {
-		  if (master->target == NULL || master->target->onLine == 0)
+		  if (master->target == NULL || !isOnLine(*(master->target)))
 		  {
 			  master->target = NULL;
 			  master->state = 0;
@@ -661,35 +777,105 @@ void QueueTest()
 		  float theLne = len(master, master->target);
 		  if (theLne<calcFightLen())
 		  {
+			  resetMaster(master);
 			  master->state = 2;
 			  return;
 		  }
+		  if (master->pathNum>master->astart)
+		  {
+			  int index = master->astart;
+			  short sx = master->path[index].x;
+			  short sz = master->path[index].z;
+			  if (Move(master->x, master->z, sx, sz))
+				  {
+					  master->x = sx;
+					  master->z = sz;
+					  master->astart++;
+					  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
+				  }
+			 else
+				  {
+					  if (master->blockcnt++>5)
+					  {
+						  resetMaster(master);
+						  master->state = 0;
+						  //printf("astart failed\n");
+					  }
+				  }
+			  return;
+			  }
 
+	
 		  int x = master->target->x - master->x;
 		  int z = master->target->z - master->z;
 
+		  short posX = master->x, posZ = master->z;
+		  char dir = -1;
+		  short detaX = 0, detaZ = 0;
 		  if (x >= ViewList::fightLen)
 		  {
-			  master->x += 1;
-			  master->dir = 0;
+			  detaX = 1;
+			  dir  = 0;
 		  }
-		  if (x <= -ViewList::fightLen)
+		  else if (x <= -ViewList::fightLen)
 		  {
-			  master->x -= 1;
-			  master->dir = 1;
+			  detaX = -1;
+			  dir = 1;
 		  }
 		  if (z >= ViewList::fightLen)
 		  {
-			  master->z += 1;
-			  master->dir = 2;
+			  detaZ = 1;
+			  dir = 2;
 		  }
-		  if (z <= -ViewList::fightLen)
+		  else if (z <= -ViewList::fightLen)
 		  {
-			  master->z -= 1;
-			  master->dir = 3;
+			  detaZ = -1;
+			  dir = 3;
 		  }
 
-		  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
+		  if (dir < 0)
+		  {
+			  printf("not important walkToTarget。");
+			  master->state = 0;
+		  }
+		  // 或许永远到达不了。因为没有真正的路径算法。隔堵墙就sb了哈哈哈。
+		  // 简单的解决走不了问题。
+		  // master沿着player朝向一直移动，乳沟阻碍了，就绕过去。绕5次还不行就，进入初始状态了。
+		  //
+		  posX = master->x + detaX;
+		  posZ = master->z + detaZ;
+		
+		  if (Move(master->x,master->z,posX,posZ))
+		  {
+			  master->x = posX;
+			  master->z = posZ;
+			  master->dir = dir;
+			  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
+		  }
+		  else
+		  {
+			  pathNode path[512];
+			  ZeroMemory(path, sizeof(int) * 512);
+			  int pathNum =  findPath(clampMap(master->x), clampMap(master->z), clampMap(master->target->x), clampMap(master->target->z), ViewList::mapData, path);
+			  if (pathNum < 50)
+			  {
+				  master->astart = 0;
+				  master->pathNum = pathNum;
+				  for (int i = 0; i < pathNum; ++i)
+				  {
+					  master->path[i].x = path[i].x;
+					  master->path[i].z = path[i].z;
+					  deCoord(master->path[i].x,master->path[i].z);
+				  }
+			  }
+			  else
+			  {
+				  resetMaster(master);
+				  master->state = 0;
+			  }
+		  }
+		 
+		
 	  }
 
 	  void AI(masterData* master)
@@ -710,19 +896,28 @@ void QueueTest()
 		  case 1: // walk
 		  {
 			  randNum = random(5);
+			  short x = master->x, z=master->z;
 			  if (0 == randNum)
-				  master->x += 1;
+				 x =  master->x + 1;
 			  else if (1 == randNum)
-				  master->x -= 1;
+				 x = master->x - 1;
 			  else if (2 == randNum)
-				  master->z -= 1;
+				 z = master->z - 1;
 			  else if (3 == randNum)
-				  master->z += 1;
+				 z = master->z + 1;
 			  else
 				  master->state = 2;
+			  
 
 			  if (randNum<4)
-				ViewList::NotifyWalk(master->id, master->x, master->z, randNum);
+			  {
+				  if (Move(master->x, master->z, x, z)) // map data check
+				  {
+					  master->x = x;
+					  master->z = z;
+					  ViewList::NotifyWalk(master->id, master->x, master->z, randNum);
+				  }
+			  }
 		  }break;
 		  case 2: // fight
 		  {
@@ -736,7 +931,7 @@ void QueueTest()
 				  {
 					  master->target = target;
 					  ViewList::NotifyFight(master->id, target->id, 0);
-					  ViewList::attrchg(target->id, HP, -random(100));
+					  ViewList::attrchg(target->id, HP, -random(10));
 				  }
 				  else
 				  {
@@ -745,7 +940,7 @@ void QueueTest()
 			  }
 			  else
 			  {
-				  if (master->target->onLine == 0)
+				  if (!isOnLine(*(master->target)))
 				  {
 					  master->target = NULL;
 					  master->state = 1; // walk
@@ -758,7 +953,7 @@ void QueueTest()
 						  if (tmp <=calcFightLen())
 						  {
 							  ViewList::NotifyFight(master->id, master->target->id, 0);
-							  ViewList::attrchg(master->target->id, HP, -random(100));
+							  ViewList::attrchg(master->target->id, HP, -random(10));
 						  }
 						  else
 						  {
@@ -778,7 +973,7 @@ void QueueTest()
 				  master->target = NULL;
 				  break;
 			  }
-			  if (master->target->onLine == 0)
+			  if (!isOnLine(*(master->target)))
 			  {
 				  master->state = 0; // stand
 				  master->target = NULL;
@@ -786,23 +981,50 @@ void QueueTest()
 			  }
 			  walkToTarget(master);
 		  }break;
+		  case 4: // fight with master
+		  {
+			  /*	  masterData* target = NULL;
+					bool getFinght = ViewList::getNearestMaster(master, &target);
+					if (getFinght)
+					{
+					master->target = target;
+					ViewList::NotifyFight(master->id, target->id, 0);
+					ViewList::attrchg(target->id, HP, -random(100));
+					}
+					else
+					{
+					master->state = 0;
+					}*/
+		  }
 		  default:
 			  break;
 		  }
 	  }
 
 	  
-
+	  bool ViewList::check(SOCKET socket)
+	  {
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (playerArray[i].sock == socket && ::isOnLine(playerArray[i]))
+				  return true;
+		  }
+		  return false;
+	  }
 	  void ViewList::Update(float t)
 	  {
-		  _tcpClientEventQueue.OnAccept();
-
+		
+			  _iocpEventQueue.OnAccept((void*)&playerArray);
+			  _tcpClientEventQueue.OnAccept((void*)&playerArray);
+	
+	
 		  for (int i = 0; i < 10; ++i)
 		  {
 			  if (hatchArray[i]._flag == 0) continue;
 
-			  if (hatchArray[i]._spawnCnt++ < hatchArray[i]._cnt)
+			  if (hatchArray[i]._spawnCnt < hatchArray[i]._cnt)
 			  {
+				  hatchArray[i]._spawnCnt++;
 				  masterData* master = NULL;
 				  bool beGet = get(&master);
 				  if (beGet)
@@ -814,7 +1036,7 @@ void QueueTest()
 		  }
 
 		  static float theTime = t;
-		  if (t - theTime < 50)
+		  if (t - theTime < 5)
 		  {
 		  }
 		  else
