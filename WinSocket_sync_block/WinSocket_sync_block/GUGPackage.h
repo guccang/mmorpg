@@ -2,6 +2,32 @@
 
 namespace GUGGAME 
 {
+	enum MSG_ID
+	{
+		MSGID_HEADER = 0,
+		MSGID_Error = 1,
+		MSGID_MAPINFO = 2,
+
+		MSGID__START_ = 999,
+		MSGID_TEST_STRING = 1000, // STRING...
+		MSGID_TEST_STRUCTURE = 1001, // STRUCT...
+		MSGID_TEST_ARRAY = 1002,// ARRAY...
+		MSGID_CONNECTED = 1003,
+		MSGID_ATTRCHG = 1004,
+		MSGID_ATTR = 1005,
+		MSGID_JUMPINMAP = 1006,
+
+		//LOGIC
+		MSGID_WALK = 2000,
+		MSGID_FIGHT = 2001,
+		MSGID_CREATE = 2002,
+		MSGID_DELETEOBJ = 2003,
+		MSGID_ENETRMAP = 2004,
+
+		// Login
+		MSGID_LOGIN = 3000,
+		MSGID_REGIST = 3001,
+	};
 
 	enum ERROR_CODE
 	{
@@ -13,6 +39,7 @@ namespace GUGGAME
 		ERROR_FIGHT_TARGET_NULL = 5,
 		ERROR_HAD_REGIST=6,
 		ERROR_FIGHT_TARGET_DEAD = 7,
+		ERROR_ENTER_MAP_NOT_LOGIN = 8,
 	};
 
 	const int HEAD_LEN = 4;
@@ -429,6 +456,51 @@ namespace GUGGAME
 		return stream;
 	}
 
+	struct MapInfo
+	{
+		unsigned int no;
+		short x;
+		short z;
+		char  d;
+		MapInfo()
+		{
+			no = MSGID_MAPINFO;
+			x = 0;
+			z = 0;
+			d = 0;
+		}
+	};
+	template<class T> inline T& operator<<(T& stream, const MapInfo& data)
+	{
+		stream << data.no << data.x << data.z << data.d;
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, MapInfo& data)
+	{
+		stream >> data.no >> data.x << data.z << data.d;
+		return stream;
+	}
+
+	struct EnterMap
+	{
+		unsigned int no;
+		short mapID;
+		EnterMap()
+		{
+			no = MSGID_ENETRMAP;
+			mapID = 0;
+		}
+	};
+	template<class T> inline T& operator<<(T& stream, const EnterMap& data)
+	{
+		stream << data.no << data.mapID;
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, EnterMap& data)
+	{
+		stream >> data.no >> data.mapID;
+		return stream;
+	}
 #pragma pack(pop)
 
 }

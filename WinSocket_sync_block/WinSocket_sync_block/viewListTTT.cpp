@@ -11,6 +11,10 @@
 #include "AStart.h"
 #define randomDW(x) (-rand()%x + (short)(x*0.5))
 #define random(x) (rand()%x)
+//#define max(a,b) ((a)>(b)?(a):(b))
+
+short bornX = 64;
+short bornZ = 38;
 
 using namespace GUGGAME;
 void act_2_utf8(const char* src, size_t src_len, char* des, size_t des_len);
@@ -18,11 +22,24 @@ enum MAPOBJ
 {
 	HERO=0,
 	OTHERPLAYER=1,
-	MASTER=2,
+	MASTER1=2,
+	MASTER2=3,
+	MASTERBOSS=4,
+};
+
+enum BLOCK
+{
+	BK_0 = 0,
+	BK_ISLAND = 1,
+	BK_S = 1<<1,
+	BK_T = 1<<2,
+	BK_C = 1<<3,
+	BK_MASTER = 1<<6,
+	BK_PLAYER = 1<<7,
 };
 
 
-char ViewList::mapData[512][512];
+char* ViewList::mapDataEx = nullptr;
 ViewList::clientQueue ViewList::_tcpClientEventQueue;
 ViewList::iocpQueue	ViewList::_iocpEventQueue;
 HANDLE ViewList::_clientEvent;
@@ -30,13 +47,11 @@ playerData ViewList::playerArray[100];
 masterData ViewList::masterArray[500];
 hatch ViewList::hatchArray[10];
 CriticalSection ViewList::m_lock;
-float ViewList::fightLen = 2.0f;
+float ViewList::fightLen = 1.0f;
 
-short mapSize = 512;
-short mapCoor = (short)(mapSize * 0.5)-1;
-short minCoor = -mapCoor;
-short maxCoor = mapCoor;
 short viewLen = 200; // ¾àÀë´óÓÚviewLen*viewLenµÄÊ±ºò¾Í²»·¢ËÍÒÆ¶¯°ü
+short mapW = 0;
+short mapH = 0;
 
 hatch::hatch()
 {
@@ -50,12 +65,75 @@ hatch::hatch()
 	_name[0] = 0;
 }
 
+
 bool isOnLine(playerData &player)
 {
 	return player.onLine == 1;
 }
 
-void hatch::init(int id, short x, short z, int radius, int cnt,char *name)
+bool needSend(playerData* player)
+{
+	if (NULL == player) return false;
+
+	if (isOnLine(*player)==false) return false;
+
+	if (player->mapid <= 0) return false;
+
+	return true;
+}
+
+inline int getIndex(short x, short z)
+{
+	return z + x*mapH;
+	//return z*mapW + x;
+}
+
+void clearMoveFlag(short x, short z)
+{
+	ViewList::mapDataEx[getIndex(x, z)] &= ~BK_MASTER;
+}
+
+bool checkPos(short x, short z)
+{
+	if (x < 0) return false;
+	if (x > mapW) return false;
+	if (z < 0) return false;
+	if (z > mapH) return false;
+	return true;
+}
+
+bool canMove(short x, short z)
+{
+	return false==ViewList::isBlock(x,z);
+}
+
+bool Move(short x, short z, short x1, short z1)
+{
+	if (!checkPos(x,z) && !checkPos(x1,z1))
+	{
+		printf("move params error \n why...................");
+		return false;
+	}
+	if (x == x1&&z == z1) return true;
+
+	if (canMove(x1, z1))
+	{
+		//ViewList::mapData[x][z] = 0;
+		//ViewList::mapData[x1][z1] = 1;
+		//printf("(%d,%d)=(%d,%d)\n",x,z, x1, z1);
+		ViewList::mapDataEx[getIndex(x, z)] &= ~BK_MASTER;
+		ViewList::mapDataEx[getIndex(x1, z1)] |= BK_MASTER;
+		return true;
+	}
+	else
+	{
+
+	}
+	return false;
+}
+
+
+void hatch::init(short id, short x, short z, int radius, int cnt,char *name)
 {
 	_MapObjectID = id;
 	_x = x;
@@ -65,9 +143,22 @@ void hatch::init(int id, short x, short z, int radius, int cnt,char *name)
 	_flag = 1;
 	strcpy_s(_name, name);
 }
-float calcFightLen()
+float calcFightLen(masterData* master)
 {
-	return ViewList::fightLen*ViewList::fightLen * 2;
+	return ViewList::fightLen + master->fightRadius;
+}
+
+char ViewList::isBlock(short x, short z)
+{
+	if (checkPos(x, z))
+	{
+		int index = getIndex(x, z);
+		if (mapDataEx[index] & BK_ISLAND || mapDataEx[index] & BK_MASTER)
+			return true;
+		else
+			return false;
+	}
+	return BK_ISLAND;
 }
 void ViewList::PushEvent(IOCPEvent* e)
 {
@@ -78,12 +169,45 @@ void ViewList::PushEvent(TCPClientEvent* e)
 	_tcpClientEventQueue.PushEvent(e);
 }
 void ViewList::masterInit()
+{/*
+ ³öÉú£º64£¬37
+ Ë¢¹Ö1£º50,23
+ Ë¢¹Ö2£º31,23
+ BOSS£º14,12
+ */
+	//hatchArray[0].init(1, 20, 0, 100, 100,"´¨É£");
+	hatchArray[1].init(MASTER1, 50, 23, 7, 12, "±©±©");
+	hatchArray[2].init(MASTER2, 31, 23, 7, 12, "ÁúÁú");
+	hatchArray[3].init(MASTERBOSS, 14, 12, 3, 1, "ÁÁÁÁ");
+	//hatchArray[4].init(5, -10, -10, 100, 100, "Ð¡Ã÷");
+}
+void ViewList::mapInit()
 {
-	hatchArray[0].init(1, -20, 0, 100, 100,"´¨É£");
-	hatchArray[1].init(2, 0, 0, 20, 100, "±©±©");
-	hatchArray[2].init(3, 20, 0, 100, 100, "ÁúÁú");
-	hatchArray[3].init(4, -20, -20, 100, 100, "ÁÁÁÁ");
-	hatchArray[4].init(5, -10, -10, 100, 100, "Ð¡Ã÷");
+	fileHandle f("./config/11.mapo");
+	int len = f.size();
+	unsigned short version = 0;
+	int sizeMap = 0;
+	f.readByte((char*)&version, sizeof(unsigned short));
+	f.readByte((char*)&mapW, sizeof(unsigned short));
+	f.readByte((char*)&mapH, sizeof(unsigned short));
+	f.readByte((char*)&sizeMap,sizeof(int));
+	printf("len:%d v:%d w:%d h:%d dataSize:%d\n", len, version, mapW, mapH,sizeMap);
+
+	int sizeData = mapW*mapH;
+	mapDataEx = new char[sizeData];
+	ZeroMemory(mapDataEx, sizeData);
+	short *data = new short[sizeData];
+	f.readByte((char*)data, sizeData*sizeof(short));
+	for (short i = 0; i < mapW; ++i)// x
+	{
+		for (short j = 0; j < mapH; ++j) // y
+		{
+			int index = getIndex(i, j); // y*w + x 
+			mapDataEx[index] = (char)data[index];
+			//printf("%d ",data[index]);
+		}
+		//printf("\n");
+	}
 }
 
 void QueueTest()
@@ -110,7 +234,6 @@ void QueueTest()
 	{
 		CriticalSection::Lock lock(m_lock);
 		ZeroMemory(playerArray, sizeof(playerData) * 100);
-		ZeroMemory(mapData, sizeof(char) * mapSize * mapSize);
 		playerData *db = NULL;
 		fileHandle f;
 		int len = f.size();
@@ -121,57 +244,14 @@ void QueueTest()
 			f.read((char**)&db, sizeof(playerData));
 			printf("name:%s %s onLine:%d %d %d %d %d\n", db->name, db->pwd, db->onLine, db->hp, db->mp, db->def, db->flag);
 		}
-
+		mapInit();
 		masterInit();
 		_clientEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		//QueueTest();
 	 }
 
-	 bool canMove(int x, int z)
-	 {
-		 return ViewList::mapData[x][z] == 0;
-	 }
-
-	 short clampMap(short x)
-	 {
-		 if (x < minCoor) x = minCoor;
-		 if (x > maxCoor) x = maxCoor;
-		 return x+mapCoor;
-	 }
-
-	 void coord(short &nx,short &nz)
-	 {
-		 nx = clampMap(nx);
-		 nz = clampMap(nz);
-	 }
-	 void deCoord(short &nx, short &nz)
-	 {
-		 nx  -= mapCoor;
-		 nz  -= mapCoor;
-	 }
-	 void clearMoveFlag(short x, short z)
-	 {
-		 coord(x, z);
-		 ViewList::mapData[x][z] = 0;
-	 }
-	 bool Move(short x, short z,short x1,short z1)
-	 {
-		 if (x == x1&&z == z1) return true;
-		 coord(x, z);
-		 coord(x1, z1);
-		 if (canMove(x1, z1))
-		 {
-			 ViewList::mapData[x][z] = 0;
-			 ViewList::mapData[x1][z1] = 1;
-			 //printf("(%d,%d)=(%d,%d)\n",x,z, x1, z1);
-			 return true;
-		 }
-		 else
-		 {
-			
-		 }
-		 return false;
-	 }
+	
+	
 
 	 int ViewList::regist(const char* name, const char *pwd)
 	 {
@@ -231,29 +311,20 @@ void QueueTest()
 			db->z = z;
 			db->dir = dir;
 			db->flag = 1;
+			db->mapid = 0;
 		}
-
-		CreateObj c;
-		c.id = db->id;
-		c.type = HERO;
-		c.x = x;
-		c.z = z;
-		c.dir = dir;
-		c.hp = db->hp;
-		strcpy_s(c.name, db->name);
-		SendStruct((SOCKET)sock, c, 1);
-
-		Attr att;
-		att.hp = db->hp;
-		att.mp = db->mp;
-		att.def = db->def;
-		att.id = db->id;
-		SendStruct((SOCKET)sock, att, 1);
-
-		NotifyCreate(db->id,OTHERPLAYER, x, z, dir);
 		return 0;
 	 }
 
+	 char* ViewList::getName(int id)
+	 {
+		 for (int i = 0; i < 100; ++i)
+		 {
+			 if (playerArray[i].id == id)
+				 return playerArray[i].name;
+		 }
+		 return 0;
+	 }
 	 int ViewList::getSock(int id)
 	 {
 		 for (int i = 0; i < 100; ++i)
@@ -268,7 +339,7 @@ void QueueTest()
 	 {
 		 for (int i = 0; i < 100; ++i)
 		 {
-			 if (playerArray[i].sock == sock)
+			 if (playerArray[i].sock == sock && isOnLine(playerArray[i]))
 				 return playerArray[i].id;
 		 }
 		 return 0;
@@ -299,6 +370,7 @@ void QueueTest()
 			{
 				playerArray[i].onLine = 0;
 				playerArray[i].sock = INVALID_SOCKET;
+				playerArray[i].mapid = 0;
 			}
 			else
 			{
@@ -306,6 +378,40 @@ void QueueTest()
 			}
 		}
 	}
+	  int ViewList::EnterMap(SOCKET sock,short mapid)
+	  {
+		  playerData* db = nullptr;
+		  int id = getID(sock);
+		  bool bfind = find(id, &db);
+		  if (false == bfind)
+		  {
+			  printf("EnterMap not find %d player",sock);
+			  return GUGGAME::ERROR_ENTER_MAP_NOT_LOGIN;
+		  }
+
+		  db->mapid = mapid;
+
+		  CreateObj c;
+		  c.id = db->id;
+		  c.type = HERO;
+		  c.x = bornX;
+		  c.z = bornZ;
+		  c.dir = 0;
+		  c.hp = db->hp;
+		  strcpy_s(c.name, db->name);
+		  SendStruct((SOCKET)sock, c, 1);
+
+		  Attr att;
+		  att.hp = db->hp;
+		  att.mp = db->mp;
+		  att.def = db->def;
+		  att.id = db->id;
+		  SendStruct((SOCKET)sock, att, 1);
+
+		  NotifyMapInfo(db->id);
+		  NotifyCreate(db->id, OTHERPLAYER, bornX, bornZ, 0);
+		  return 0;
+	  }
 
 	  bool ViewList::find(const char* name, playerData** freeData)
 	  {
@@ -345,14 +451,16 @@ void QueueTest()
 		  return false;
 	  }
 
-	  float distance(short x, short z, short x1, short z1)
+	  int distance(short x, short z, short x1, short z1)
 	  {
-		  int nx = x - x1;
-		  int nz = z - z1;
-		  return float(nx*nx + nz*nz);
+		  int nx = abs(x - x1);
+		  int nz = abs(z - z1);
+		  //return abs(nx) + abs(nz) + 0.3f;
+		  //return float(nx*nx + nz*nz);
+		  return max(nx, nz);
 	  }
 
-	  float len(masterData* master, masterData* target)
+	  int len(masterData* master, masterData* target)
 	  {
 		  if (master == NULL || target == NULL)
 		  {
@@ -363,7 +471,7 @@ void QueueTest()
 	  }
 
 	  
-	  float len(masterData* master,playerData* target)
+	  int len(masterData* master,playerData* target)
 	  {
 		  if (master == NULL || target == NULL)
 		  {
@@ -375,12 +483,12 @@ void QueueTest()
 	  bool ViewList::getNearestMaster(masterData* master, masterData** freeData)
 	  {
 		  *freeData = NULL;
-		  float tmp = 99999999.0f;
+		  int tmp = 99999999;
 		  for (int i = 0; i < 500; ++i)
 		  {
 			  if (masterArray[i].flag == 0 || masterArray[i].dead>0) continue;
-			  float theLen = len(master, &masterArray[i]);
-			  if (theLen>0 && tmp > theLen && theLen <= calcFightLen())
+			  int theLen = len(master, &masterArray[i]);
+			  if (theLen>0 && tmp > theLen && theLen <= calcFightLen(master))
 			  {
 				  tmp = theLen;
 				  *freeData = &masterArray[i];
@@ -394,12 +502,12 @@ void QueueTest()
 	  bool ViewList::getNearestPlayer(masterData* master,playerData** freeData)
 	  {
 		  *freeData = NULL;
-		  float tmp = 99999999.0f;
+		  int tmp = 99999999;
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  if (!isOnLine(playerArray[i])) continue;
-			  float theLen = len(master, &playerArray[i]);
-			  if (theLen>0&&tmp > theLen && theLen<=calcFightLen())
+			  int theLen = len(master, &playerArray[i]);
+			  if (theLen>0&&tmp > theLen && theLen<=master->radius)
 			  {
 				  tmp = theLen;
 				  *freeData = &playerArray[i];
@@ -438,6 +546,7 @@ void QueueTest()
 	}
 	*/
 
+
 	void ViewList::NotifyCreate(int id, int type, short x, short z, char dir)
 	{
 		type = type;
@@ -449,7 +558,8 @@ void QueueTest()
 		
 		for (int i = 0; i < 100; ++i)
 		{
-			if (!isOnLine(playerArray[i])) continue;
+			//if (!isOnLine(playerArray[i])) continue;
+			if (needSend(&playerArray[i])==false) continue;
 
 			// newplayer to other
 			if (p->id != playerArray[i].id)
@@ -468,7 +578,7 @@ void QueueTest()
 
 		for (int i = 0; i < 100; ++i)
 		{
-			if (!isOnLine(playerArray[i]) || playerArray[i].id == id) continue;
+			if (!needSend(&playerArray[i]) || playerArray[i].id == id) continue;
 
 			// other player to new Player
 			CreateObj cc;
@@ -488,7 +598,7 @@ void QueueTest()
 
 			CreateObj cc;
 			cc.id = masterArray[i].id;
-			cc.type = MASTER;
+			cc.type = masterArray[i].masterType;
 			cc.x = masterArray[i].x;
 			cc.z = masterArray[i].z;
 			cc.dir = masterArray[i].dir;
@@ -498,6 +608,7 @@ void QueueTest()
 		}
 
 		NotifyAttrInit(p->id, p->hp, p->mp, p->def);
+
 	}
 
 	  void ViewList::NotifyWalk(int id,short x,short y,char dir)
@@ -526,7 +637,8 @@ void QueueTest()
 		  
 		  for (int i = 0; i < 100;++i)
 		  {
-			  if (!isOnLine(playerArray[i]))continue;
+			  if (!needSend(&playerArray[i]))continue;
+			  if (playerArray[i].mapid <= 0)continue;
 
 			  if (isPlayer&&p->id != playerArray[i].id)
 			  {
@@ -541,6 +653,7 @@ void QueueTest()
 			  {
 				  if (len(master, &playerArray[i])>viewLen*viewLen)
 					  continue;
+
 				  Walk w;
 				  w.id = id;
 				  w.x = master->x;
@@ -556,7 +669,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (isOnLine(playerArray[i]))
+			  if (needSend(&playerArray[i]))
 			  {
 				  Fight f;
 				  f.attackerID = attack;
@@ -567,6 +680,66 @@ void QueueTest()
 		  }
 	  }
 
+	  void ViewList::NotifyMapInfo(int id)
+	  {
+		  CriticalSection::Lock lock(m_lock);
+		  if (strcmp("guccang", getName(id)) != 0)
+			  return;
+		  SOCKET sock = getSock(id);
+		  for (short i = 0; i < mapW; ++i)
+		  {
+			  MapInfo info;
+			  info.x = i;
+			  info.z = -1;
+			  info.d = 1;
+			  SendStruct(sock, info, 1);
+
+			  info.x = i;
+			  info.z = mapH;
+			  info.d = 1;
+			  SendStruct(sock, info, 1);
+			  Sleep(1);
+		  }
+		  for (short i = 0; i < mapH; ++i)
+		  {
+
+			  MapInfo info;
+			  info.x = -1;
+			  info.z = i;
+			  info.d = 1;
+			  SendStruct(sock, info, 1);
+
+			  info.x = mapW;
+			  info.z = i;
+			  info.d = 1;
+			  SendStruct(sock, info, 1);
+			  Sleep(1);
+		  }
+			  int cnt = 0;
+			  for (int i = 0; i < 100; ++i)
+			  {
+				  if (!needSend(&playerArray[i]) || playerArray[i].id != id) continue;
+
+				  for (short x = 0; x < mapW; ++x)
+				  {
+					  for (short z = 0; z < mapH; ++z)
+					  {
+						  if ((mapDataEx[getIndex(x,z)] & BK_ISLAND) == 1)
+						  {
+							  MapInfo info;
+							  info.x = x;
+							  info.z = z;
+							  info.d = BK_ISLAND;
+							  SendStruct(sock, info, 1);
+							 // cnt++;
+							  Sleep(1);
+						  }
+					  }
+				  }
+			  }
+			  printf("send block info:%d",cnt);
+	  }
+
 	  void ViewList::NotifyAttrChg(int id ,int  type, int num)
 	  {
 		  CriticalSection::Lock lock(m_lock);
@@ -574,7 +747,7 @@ void QueueTest()
 		  {
 			  for (int i = 0; i < 100; ++i)
 			  {
-				  if (!isOnLine(playerArray[i])) continue;
+				  if (!needSend(&playerArray[i])) continue;
 
 				  // notify hp chang
 				  AttrChg att;
@@ -599,7 +772,7 @@ void QueueTest()
 
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (!isOnLine(playerArray[i])) continue;
+			  if (!needSend(&playerArray[i])) continue;
 
 			  Attr att;
 			  att.id = id;
@@ -615,7 +788,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (!isOnLine(playerArray[i])) continue;
+			  if (!needSend(&playerArray[i])) continue;
 
 			  // notify self hp chang
 			  Attr att;
@@ -629,7 +802,7 @@ void QueueTest()
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  // notify other to you
-			  if (!isOnLine(playerArray[i])) continue;
+			  if (!needSend(&playerArray[i])) continue;
 			  if (playerArray[i].id == id) continue;
 
 			  Attr att;
@@ -660,7 +833,7 @@ void QueueTest()
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (!isOnLine(playerArray[i])) continue;
+			  if (!needSend(&playerArray[i])) continue;
 			  JumpInMap jim;
 			  jim.id = id;
 			  jim.x = x;
@@ -673,7 +846,7 @@ void QueueTest()
 	  void ViewList::areoDamage(short x, short z, char radius, int demage,int attackID,short action)
 	  {
 		  CriticalSection::Lock lock(m_lock);
-		  float dis = (float)radius*radius;
+		  int dis = (int)radius;
 		  int num = 0;
 		  playerData* player = NULL;
 		  bool find = ViewList::find(attackID, &player);
@@ -696,7 +869,7 @@ void QueueTest()
 		  printf("master num:%d\n",num);
 		  for (int i = 0; i < 100; ++i)
 		  {
-			  if (!isOnLine(playerArray[i])) continue;
+			  if (!needSend(&playerArray[i])) continue;
 			  if (attackID == playerArray[i].id) continue;
 
 			  if (distance(x, z, playerArray[i].x, playerArray[i].z) <= dis)
@@ -719,15 +892,29 @@ void QueueTest()
 
 			  if (type == HP)
 			  {
-				  player->hp += num;
-				  if (player->hp < 0) player->hp = 0;
-				  NotifyAttrChg(id, HP, num);
-			  }
+				  if (player->shield > 0) // shiled
+				  {
+					  player->shield += num;
+					  if (player->shield < 0) player->shield = 0;
+					  NotifyAttrChg(id, SHIELD, player->shield);
+				  }
+				  else
+				  {
+					  player->hp += num;
+					  if (player->hp < 0) player->hp = 0;
+					  NotifyAttrChg(id, HP, num);
+				  }
+			 }
 			  if (type == MP)
 			  {
 				  player->mp += num;
 				  if (player->mp < 0) player->mp = 0;
 				  NotifyAttrChg(id, MP, num);
+			  }
+
+			  if (type == SHIELD)
+			  {
+				  NotifyAttrChg(id, SHIELD, player->shield);
 			  }
 
 			  if (player->hp <= 0)
@@ -736,8 +923,8 @@ void QueueTest()
 				  player->mp = 150000;
 				  player->def = 100;
 				  clearMoveFlag(player->x, player->z);
-				  player->x = randomDW(10);
-				  player->z = randomDW(10);
+				  player->x = bornX;
+				  player->z = bornZ;
 				  NotifyJump(id, player->x,player->z, player->dir);
 				  NotifyAttrInit(id, player->hp, player->mp, player->def);
 			  }
@@ -773,17 +960,18 @@ void QueueTest()
 	  void InitMaster(masterData* master,int spawnId,hatch* sp)
 	  {
 		  int radius = sp->_radius;
+		  master->masterType = sp->_MapObjectID;
 		  master->spawnid = spawnId;
 		  if (master->dead==0)
 			 master->id = MapMgr::generateID(1);
 		  master->radius = radius;
-		  master->hp = 300;
+		  master->hp = 500*master->masterType;
 		  master->mp = 100;
 		  master->def = 10; 
 		  master->dir = 0;
 		  master->dead = 0;
-		  master->x = sp->_x + (short)randomDW(radius);
-		  master->z = sp->_z+(short)randomDW(radius);
+		  master->x = sp->_x + (short)random(radius);
+		  master->z = sp->_z + (short)random(radius);
 		  master->bx = master->x;
 		  master->bz = master->z;
 		  act_2_utf8(sp->_name, 5, master->name, 16);
@@ -793,6 +981,7 @@ void QueueTest()
 		  master->blockcnt = 0;
 		  master->astart = 0;
 		  master->pathNum = 0;
+		  master->fightRadius = 0;// (short)(master->masterType*0.5f);
 	  }
 
 	  bool ViewList::get(masterData** freeData)
@@ -816,15 +1005,15 @@ void QueueTest()
 	  }
 	  void walkToTarget(masterData* master)
 	  {
-		  if (master->target == NULL || !isOnLine(*(master->target)))
+		  if (master->target == NULL || !needSend((master->target)))
 		  {
 			  master->target = NULL;
 			  master->state = 0;
 			  return;
 		  }
 
-		  float theLne = len(master, master->target);
-		  if (theLne<calcFightLen())
+		  int theLne = len(master, master->target);
+		  if (theLne<=calcFightLen(master))
 		  {
 			  resetMaster(master);
 			  master->state = 2;
@@ -903,10 +1092,10 @@ void QueueTest()
 		  }
 		  else
 		  {
-			  pathNode path[512];
-			  ZeroMemory(path, sizeof(int) * 512);
-			  int pathNum =  findPath(clampMap(master->x), clampMap(master->z), clampMap(master->target->x), clampMap(master->target->z), ViewList::mapData, path);
-			  if (pathNum < 50)
+			  pathNode path[50];
+			  ZeroMemory(path, sizeof(int) * 50);
+			  int pathNum =  findPath((master->x), (master->z), (master->target->x), (master->target->z), path);
+			  if (pathNum < 10)
 			  {
 				  master->astart = 0;
 				  master->pathNum = pathNum;
@@ -914,7 +1103,6 @@ void QueueTest()
 				  {
 					  master->path[i].x = path[i].x;
 					  master->path[i].z = path[i].z;
-					  deCoord(master->path[i].x,master->path[i].z);
 				  }
 			  }
 			  else
@@ -947,9 +1135,9 @@ void QueueTest()
 			  randNum = random(5);
 			  short x = master->x, z=master->z;
 			  short bx = master->bx, bz = master->bz;
-			  float dis = distance(x, z, bx, bz);
+			  int dis = distance(x, z, bx, bz);
 			  short detax=0, detaz=0;
-			  if (dis > master->radius*master->radius)
+			  if (dis > master->radius)
 			  {
 				  detax = (bx - x)>0?1:-1;
 				  detaz = (bz - z)>0?1:-1;
@@ -996,8 +1184,8 @@ void QueueTest()
 				  if (getFinght)
 				  {
 					  master->target = target;
-					  ViewList::NotifyFight(master->id, target->id, 0);
-					  ViewList::attrchg(target->id, HP, -random(10));
+					  //ViewList::NotifyFight(master->id, target->id, 0);
+					  //ViewList::attrchg(target->id, HP, -random(10));
 				  }
 				  else
 				  {
@@ -1006,17 +1194,17 @@ void QueueTest()
 			  }
 			  else
 			  {
-				  if (!isOnLine(*(master->target)))
+				  if (!needSend((master->target)))
 				  {
 					  master->target = NULL;
 					  master->state = 1; // walk
 				  }
 				  else
 				  {
-					  float tmp = len(master, master->target);
+					  int tmp = len(master, master->target);
 					  if (tmp > 0)
 					  {
-						  if (tmp <=calcFightLen())
+						  if (tmp <=calcFightLen(master))
 						  {
 							  ViewList::NotifyFight(master->id, master->target->id, 0);
 							  ViewList::attrchg(master->target->id, HP, -random(10));
@@ -1039,7 +1227,7 @@ void QueueTest()
 				  master->target = NULL;
 				  break;
 			  }
-			  if (!isOnLine(*(master->target)))
+			  if (!needSend((master->target)))
 			  {
 				  master->state = 0; // stand
 				  master->target = NULL;
@@ -1114,11 +1302,11 @@ void QueueTest()
 				  if (masterArray[i].flag != 1) continue;
 				  if (masterArray[i].dead > 0)
 				  {
-					  if (masterArray[i].dead++<5)
+					  if (masterArray[i].dead++<masterArray[i].masterType*10)
 						  continue;
 					  int spawnid = masterArray[i].spawnid;
 					  InitMaster(&masterArray[i], spawnid ,&hatchArray[spawnid]);
-					  masterArray[i].hp = 600;
+					  masterArray[i].hp = 700*masterArray[i].masterType;
 					  masterArray[i].mp = 300;
 					  masterArray[i].def = 90;
 					  masterArray[i].dead = 0;

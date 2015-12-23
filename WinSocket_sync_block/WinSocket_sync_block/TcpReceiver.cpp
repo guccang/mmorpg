@@ -8,8 +8,6 @@
 #define random(x) (rand()%x)
 #include "MapMgr.h"
 
-short bornX = 64;
-short bornZ = 38;
 
 void clearStream(LEUD::StreamFix &stream,  size_t seekLen);
 
@@ -44,6 +42,11 @@ int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
 
 void SkillUse(SOCKET client,Fight &f)
 {
+	if (f.action == 999)
+	{
+		ViewList::NotifyMapInfo(f.attackerID);
+		return;
+	}
 	playerData *player = NULL;
 	playerData *target = NULL;
 	masterData *master = NULL;
@@ -76,7 +79,9 @@ void SkillUse(SOCKET client,Fight &f)
 	}
 
 
-	if (player != NULL && (targetId > 0||f.action==3) && errorcode == GUGGAME::OK)
+	if (player != NULL &&
+		(targetId > 0||f.action==3||f.action==4) &&
+		errorcode == GUGGAME::OK)
 	{
 
 		if (f.action == 0) // normal
@@ -153,6 +158,15 @@ void SkillUse(SOCKET client,Fight &f)
 			ViewList::attrchg(f.attackerID, MP, -30);
 			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
 		}
+		else if (4 == f.action) // shiled
+		{
+			if (player->mp >= 50)
+			{
+				ViewList::attrchg(f.attackerID, MP, -50);
+				player->shield = 5000;
+				ViewList::attrchg(f.attackerID, SHIELD, player->shield);
+			}
+		}
 	}
 	else
 	{
@@ -184,18 +198,18 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 				if (!ViewList::check(client))
 					return;
 			}
-			if (mssgid == 1000)
+			if (mssgid == MSGID_TEST_STRING)
 			{
 				Pakcage64 pag;
 				stream >> pag;
-				if (1000 != pag.no)
+				if (MSGID_TEST_STRING != pag.no)
 				{
 					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
 				}
 				//printf("recv num %d:%d:%s\n", ++cnt, pag.no, pag.data);
 				SendStruct(client, pag, 1);
 			}
-			else if (1001 == mssgid)
+			else if (MSGID_TEST_STRUCTURE == mssgid)
 			{
 
 				//printf("recv num %d\n", ++cnt);
@@ -212,24 +226,24 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 					//				 char* buf =	stream.m_Buffer;
 				}
 
-				if (1001 != t02.no)
+				if (MSGID_TEST_STRUCTURE != t02.no)
 				{
 					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
 				}
 				SendStruct(client, t02, 1);
 			}
-			else if (1002 == mssgid)
+			else if (MSGID_TEST_ARRAY == mssgid)
 			{
 				//printf("recv num %d\n", ++cnt);
 				test03 t03;
 				stream >> t03;
-				if (1002 != t03.no)
+				if (MSGID_TEST_ARRAY != t03.no)
 				{
 					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
 				}
 				SendStruct(client, t03, 1);
 			}
-			else if (2000 == mssgid)
+			else if (MSGID_WALK == mssgid)
 			{
 				Walk w;
 				stream >> w;
@@ -237,18 +251,18 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 				SendStruct(client, w, 1);
 				ViewList::NotifyWalk(w.id, w.x, w.z, w.dir);
 			}
-			else if (2001 == mssgid)
+			else if (MSGID_FIGHT == mssgid)
 			{
 				Fight f;
 				stream >> f;
 				SkillUse(client, f);
 
 			}
-			else if (3000 == mssgid)
+			else if (MSGID_LOGIN == mssgid)
 			{
 				Login lg;
 				stream >> lg;
-				int code = ViewList::add(client, 0, 0, 0, (char*)lg.name, (char*)lg.pwd);
+				int code = ViewList::add(client, bornX, bornZ, 0, (char*)lg.name, (char*)lg.pwd);
 				//if( GUGGAME::OK!=code)
 				{
 					ErrorCode ec;
@@ -257,12 +271,26 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 					SendStruct(client, ec, 1);
 				}
 			}
-			else if (3001 == mssgid)
+			else if (MSGID_REGIST == mssgid)
 			{
 				Register lg;
 				stream >> lg;
 				int error = ViewList::regist(lg.name, lg.pwd);
 				//if (error != GUGGAME::OK)
+				{
+					ErrorCode ec;
+					ec.msgid = mssgid;
+					ec.errorcode = error;
+					SendStruct(client, ec, 1);
+				}
+			}
+			else if (MSGID_ENETRMAP == mssgid)
+			{
+				EnterMap em;
+				stream >> em;
+				//SendStruct(perIOData->client, em, 1);
+				int error = ViewList::EnterMap(client, em.mapID);
+				if (GUGGAME::OK != error)
 				{
 					ErrorCode ec;
 					ec.msgid = mssgid;
@@ -421,7 +449,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 			{
 				Login lg;
 				stream >> lg;
-				int code = ViewList::add(perIOData->client, bornX,bornZ, 0, (char*)lg.name, (char*)lg.pwd);
+				int code = ViewList::add(perIOData->client, bornX, bornZ, 0, (char*)lg.name, (char*)lg.pwd);
 				//if( GUGGAME::OK!=code)
 				{
 					ErrorCode ec;
@@ -443,6 +471,7 @@ int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
 					SendStruct(perIOData->client, ec, 1);
 				}
 			}
+		
 			int seekLen = msgLen;
 			clearStream(stream, seekLen);
 		}

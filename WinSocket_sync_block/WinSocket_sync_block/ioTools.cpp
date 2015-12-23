@@ -7,6 +7,14 @@ fileHandle::fileHandle()
 	of = new ofstream(fileName, ios::out | ios::app | ios::binary);
 	is = new ifstream(fileName, ios::binary);
 }
+
+fileHandle::fileHandle(char* name)
+{
+	strcpy_s(fileName, name);
+	of = new ofstream(fileName, ios::out | ios::app | ios::binary);
+	is = new ifstream(fileName, ios::binary);
+}
+
 int fileHandle::write(const char* data, int size)
 {
 	of->write(data, size);
@@ -26,6 +34,12 @@ int fileHandle::read(char** data, int size)
 	is->read(*data, size);
 	return size;
 }
+int fileHandle::readByte(char* data, int size)
+{
+	is->read(data, size);
+	return size;
+}
+
 void fileHandle::close()
 {
 	of->close();

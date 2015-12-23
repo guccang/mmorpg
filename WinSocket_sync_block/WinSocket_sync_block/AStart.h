@@ -1,5 +1,6 @@
 #pragma once
 #include "GUCQueue.h"
+#include "viewListTTT.h"
 namespace GUGGAME
 {
 struct pathNode;
@@ -65,6 +66,11 @@ void insert(queue<asNode> *open, asNode* node)
 				return;
 			}
 			asNode *nx = pre->_next;
+			if (NULL == nx)
+			{
+				open->push_back(node);
+				return;
+			}
 			while (nx)
 			{
 					if (node->f <= nx->f)
@@ -79,10 +85,7 @@ void insert(queue<asNode> *open, asNode* node)
 						nx = nx->_next;
 					}
 			}
-			if (NULL == nx)
-			{
-				open->push_back(node);
-			}
+			
 }
 
 void AddNode(asNode* curNode,asNode *nexNode,short tx,short tz,queue<asNode>&open)
@@ -91,9 +94,14 @@ void AddNode(asNode* curNode,asNode *nexNode,short tx,short tz,queue<asNode>&ope
 	insert(&open, nexNode);
 }
 
-int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode* path)
+inline bool isNotBlock(short x,short z)
 {
-	const int size = 50;
+	return !ViewList::isBlock(x,z);
+}
+
+int  findPath(short x, short z,short tx,short tz, pathNode* path)
+{
+	const int size = 30;
 	asNode nodeArray[size];
 	int index = 0;
 	queue<asNode> open;
@@ -109,14 +117,14 @@ int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode
 	{
 		open.pop_front();
 		if (noFind(&close,node->x,node->z))	close.push_back(node);
-		if (node->x == tx && node->z == tx ||index>=size-4)
+		if (node->x == tx && node->z == tx ||index>=size-8)
 			break;
 		//getCanMove(*node);
 		short nx, nz;
 		asNode *newNode = NULL;
 		nx = node->x + 1;
 		nz = node->z;
-		if (notFind(&open,&close,nx,nz) && mapData[nx][nz] == 0)
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
 		{
 			newNode = &nodeArray[index++];
 			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
@@ -124,7 +132,7 @@ int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode
 		}
 		nx = node->x - 1;
 		nz = node->z;
-		if (notFind(&open, &close, nx, nz) && mapData[nx][nz] == 0)
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
 		{
 			newNode = &nodeArray[index++];
 			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
@@ -132,7 +140,7 @@ int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode
 		}
 		nx = node->x;
 		nz = node->z + 1;
-		if (notFind(&open, &close, nx, nz) && mapData[nx][nz] == 0)
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
 		{
 			newNode = &nodeArray[index++];
 			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
@@ -141,13 +149,44 @@ int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode
 		}
 		nx = node->x;
 		nz = node->z - 1;
-		if (notFind(&open, &close, nx, nz) && mapData[nx][nz] == 0)
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
 		{
 			newNode = &nodeArray[index++];
 			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
 			insert(&open, newNode);
 		}
-
+		nx = node->x + 1;
+		nz = node->z + 1;
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
+		{
+			newNode = &nodeArray[index++];
+			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
+			insert(&open, newNode);
+		}
+		nx = node->x - 1;
+		nz = node->z - 1;
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
+		{
+			newNode = &nodeArray[index++];
+			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
+			insert(&open, newNode);
+		}
+		nx = node->x + 1;
+		nz = node->z - 1;
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
+		{
+			newNode = &nodeArray[index++];
+			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
+			insert(&open, newNode);
+		}
+		nx = node->x - 1;
+		nz = node->z + 1;
+		if (notFind(&open, &close, nx, nz) && isNotBlock(nx, nz))
+		{
+			newNode = &nodeArray[index++];
+			setNode(node->x, node->z, nx, nz, tx, tz, *newNode);
+			insert(&open, newNode);
+		}
 
 	}
 
@@ -159,7 +198,7 @@ int  findPath(short x, short z,short tx,short tz,char mapData[512][512],pathNode
 		path[i].z = node->z;
 		i++;
 	}
-	//printf("path node : %d\n", i);
+	printf("path node : %d\n", i);
 
 	return i;
 }

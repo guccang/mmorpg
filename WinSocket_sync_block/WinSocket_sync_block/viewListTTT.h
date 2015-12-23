@@ -11,10 +11,13 @@
 	 };
  }
 class hatch;
+extern short bornX;
+extern short bornZ;
 enum ENUM_ATTR
 {
 	HP = 0,
 	MP = 1,
+	SHIELD = 2,
 };
 class mapObj
 {
@@ -34,18 +37,21 @@ struct playerData : public mapObj
 	int def;
 	char name[16];
 	char pwd[32];
+	int shield; //»¤¶Ü
 	int flag; // 1 use
+	int mapid;
 };
 
 struct masterData : public mapObj
 {
 	int id;
+	short masterType;
 	int spawnid;
 	short x;
 	short z;
 	short bx; // born x ,z
 	short bz;
-	int radius;
+	int radius; 
 	char dir;
 	int hp;
 	int mp;
@@ -58,8 +64,9 @@ struct masterData : public mapObj
 	playerData* target;
 	int blockcnt;
 	int astart;
-	pathNode path[50];
+	pathNode path[10];
 	int pathNum;
+	short fightRadius;
 };
 
 class ViewList
@@ -82,23 +89,28 @@ public:
 	static void NotifyFight(int id, int target,short action);
 	static void NotifyAttrChg(int id,int attr, int num);
 	static void NotifyMasterCreate(int id, short x, short y, char dir);
+	static void NotifyMapInfo(int id);
 	static bool getNearestPlayer(masterData* master,playerData** freeData);
 	static bool getNearestMaster(masterData* master, masterData** freeData);
 	static void areoDamage(short x, short z, char radius,int demage,int attackID,short action);
 	static bool find(int id, playerData** freeData);
+	static int EnterMap(SOCKET sock,short mapid);
 	static bool get(playerData** freeData);
 	static bool get(masterData** freeData);
 	static bool find(const char* name, playerData** freeData);
 	static bool find(int id, masterData** freeData);
 	static int getID(SOCKET sock);
 	static int getSock(int id);
+	static char* getName(int id);
 	static void Update(float t);
 	static void masterInit();
+	static void mapInit();
 	static bool check(SOCKET socket);
 	static void PushEvent(TCPClientEvent* e);
 	static void PushEvent(IOCPEvent* e);
+	static char isBlock(short x, short z);
 	//static bool get(dbData** freeData);
-	static char mapData[512][512];
+	static char *mapDataEx;
 private:
 	static playerData playerArray[100];
 	static masterData masterArray[500];
@@ -120,8 +132,8 @@ class hatch
 {
 public:
 	hatch();
-	void init(int id,short x,short z,int radius,int cnt,char* name);
-	int _MapObjectID;
+	void init(short id,short x,short z,int radius,int cnt,char* name);
+	short _MapObjectID;
 	short _x;
 	short _z;
 	int _radius;
