@@ -19,6 +19,15 @@ enum ENUM_ATTR
 	MP = 1,
 	SHIELD = 2,
 };
+enum ENUM_SKILL_TYPE
+{
+	SKILL_NORMAL=0,
+	SKILL_TRAIL=1,
+	SKILL_AREA_TARGET=2,
+	SKILL_AREA_SELF=3,
+	SKILL_AREA_ISLAND=4,
+	SKILL_SHILED=5,
+};
 class mapObj
 {
 
@@ -79,7 +88,7 @@ public:
 	static int regist(const char* name,const char *pwd);
 	static int add(int sock, short x,short y, char dir,const char*name,const char*pwd);
 	static void remove(SOCKET socke,int errorCode);
-	static void attrchg(int id, int type, int num);
+	static void attrchg(int id, int type, int num,short delay=0);
 	static void attrchgAreo(int* targets, int num, int type, int demage);
 	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
@@ -87,7 +96,7 @@ public:
 	static void NotifyCreate(int id, int type, short x, short y, char dir);
 	static void NotifyWalk(int id,short x,short y,char dir);
 	static void NotifyFight(int id, int target,short action);
-	static void NotifyAttrChg(int id,int attr, int num);
+	static void NotifyAttrChg(int id,int attr, int num,short delay=0);
 	static void NotifyMasterCreate(int id, short x, short y, char dir);
 	static void NotifyMapInfo(int id);
 	static bool getNearestPlayer(masterData* master,playerData** freeData);
@@ -109,6 +118,7 @@ public:
 	static void PushEvent(TCPClientEvent* e);
 	static void PushEvent(IOCPEvent* e);
 	static char isBlock(short x, short z);
+	static short  getSkillDelayTime(short skillID);
 	//static bool get(dbData** freeData);
 	static char *mapDataEx;
 private:

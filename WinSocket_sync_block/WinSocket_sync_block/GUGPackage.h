@@ -394,19 +394,21 @@ namespace GUGGAME
 		int id;
 		short type;
 		short num;
+		short delay; // ms
 		AttrChg()
 		{
 			no = 1004;
+			delay = 0;
 		}
 	};
 	template<class T> inline T& operator<<(T& stream, const AttrChg& data)
 	{
-		stream << data.no <<  data.id << data.type << data.num;
+		stream << data.no <<  data.id << data.type << data.num << data.delay;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, AttrChg& data)
 	{
-		stream >> data.no >> >> data.id >> data.type >> data.num;
+		stream >> data.no >> >> data.id >> data.type >> data.num >> data.delay;
 		return stream;
 	}
 

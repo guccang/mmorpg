@@ -15,9 +15,11 @@
 
 short bornX = 64;
 short bornZ = 38;
+short AIUpdateTime = 7;
 
 using namespace GUGGAME;
 void act_2_utf8(const char* src, size_t src_len, char* des, size_t des_len);
+
 enum MAPOBJ
 {
 	HERO=0,
@@ -349,7 +351,8 @@ void QueueTest()
 		CriticalSection::Lock lock(m_lock);
 		DeleteObj del;
 		del.id = getID(socke);
-		if (errorCode == WSAENOTSOCK)
+		errorCode = errorCode;
+	/*	if (errorCode == WSAENOTSOCK)
 		{
 		}
 		else if (errorCode == WSAECONNABORTED)
@@ -361,19 +364,23 @@ void QueueTest()
 			printf("why... fixed this please.");
 			return;
 		}
-
+	*/
 		for (int i = 0; i < 100; ++i)
 		{
 			if (!isOnLine(playerArray[i])) continue;;
 
 			if (playerArray[i].sock == socke)
 			{
+				//printf("Vliew::remove self sock=%d error=%d", socke, errorCode);
+
 				playerArray[i].onLine = 0;
 				playerArray[i].sock = INVALID_SOCKET;
 				playerArray[i].mapid = 0;
 			}
 			else
 			{
+				//printf("Vliew::remove Not Self sock=%d error=%d", socke, errorCode);
+
 				SendStruct((SOCKET)playerArray[i].sock,del,1);
 			}
 		}
@@ -623,8 +630,7 @@ void QueueTest()
 			  bfind = find(id, &p);
 			  if (false == bfind) return;
 			  p->x = x; p->z = y;
-			  if (dir != 4)
-				  p->dir = dir;
+			  p->dir = dir;
 		  }
 		  else
 		  {
@@ -652,7 +658,7 @@ void QueueTest()
 			  else if (!isPlayer)
 			  {
 				  if (len(master, &playerArray[i])>viewLen*viewLen)
-					  continue;
+				 	  continue;
 
 				  Walk w;
 				  w.id = id;
@@ -698,7 +704,7 @@ void QueueTest()
 			  info.z = mapH;
 			  info.d = 1;
 			  SendStruct(sock, info, 1);
-			  Sleep(1);
+			 // Sleep(1);
 		  }
 		  for (short i = 0; i < mapH; ++i)
 		  {
@@ -732,7 +738,7 @@ void QueueTest()
 							  info.d = BK_ISLAND;
 							  SendStruct(sock, info, 1);
 							 // cnt++;
-							  Sleep(1);
+							 // Sleep(1);
 						  }
 					  }
 				  }
@@ -740,7 +746,7 @@ void QueueTest()
 			  printf("send block info:%d",cnt);
 	  }
 
-	  void ViewList::NotifyAttrChg(int id ,int  type, int num)
+	  void ViewList::NotifyAttrChg(int id ,int  type, int num,short delay)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  //if (MapMgr::isPlayer(id))
@@ -754,6 +760,7 @@ void QueueTest()
 				  att.id = id;
 				  att.type = (short)type;
 				  att.num = (short)num;
+				  att.delay = delay;
 				  SendStruct(playerArray[i].sock, att, 1);
 			  }
 		  }
@@ -852,7 +859,7 @@ void QueueTest()
 		  bool find = ViewList::find(attackID, &player);
 		  if (!find)
 		  {
-			  printf("areo damage not find player....why....");
+			  printf("areo damage not find player....why....\n");
 			  return;
 		  }
 		  for (int i = 0; i < 500; ++i)
@@ -880,7 +887,7 @@ void QueueTest()
 		  }
 	  }
 	
-	  void ViewList::attrchg(int id, int type, int num)
+	  void ViewList::attrchg(int id, int type, int num,short delay)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  bool isPlayer = MapMgr::isPlayer(id);
@@ -896,25 +903,25 @@ void QueueTest()
 				  {
 					  player->shield += num;
 					  if (player->shield < 0) player->shield = 0;
-					  NotifyAttrChg(id, SHIELD, player->shield);
+					  NotifyAttrChg(id, SHIELD, player->shield,delay);
 				  }
 				  else
 				  {
 					  player->hp += num;
 					  if (player->hp < 0) player->hp = 0;
-					  NotifyAttrChg(id, HP, num);
+					  NotifyAttrChg(id, HP, num,delay);
 				  }
 			 }
 			  if (type == MP)
 			  {
 				  player->mp += num;
 				  if (player->mp < 0) player->mp = 0;
-				  NotifyAttrChg(id, MP, num);
+				  NotifyAttrChg(id, MP, num,delay);
 			  }
 
 			  if (type == SHIELD)
 			  {
-				  NotifyAttrChg(id, SHIELD, player->shield);
+				  NotifyAttrChg(id, SHIELD, player->shield,delay);
 			  }
 
 			  if (player->hp <= 0)
@@ -938,12 +945,12 @@ void QueueTest()
 			  if (type == HP)
 			  {
 				  master->hp += num;
-				  NotifyAttrChg(id, HP, num);
+				  NotifyAttrChg(id, HP, num,delay);
 			  }
 			  if (type == MP)
 			  {
 				  master->mp += num;
-				  NotifyAttrChg(id, MP, num);
+				  NotifyAttrChg(id, MP, num,delay);
 			  }
 
 			  if (master->hp <= 0)
@@ -1024,6 +1031,11 @@ void QueueTest()
 			  int index = master->astart;
 			  short sx = master->path[index].x;
 			  short sz = master->path[index].z;
+			  if (abs(master->x - sx) > 5 ||
+				  abs(master->z - sz) > 5)
+			  {
+				  printf("some error on path find...");
+			  }
 			  if (Move(master->x, master->z, sx, sz))
 				  {
 					  master->x = sx;
@@ -1085,6 +1097,11 @@ void QueueTest()
 		
 		  if (Move(master->x,master->z,posX,posZ))
 		  {
+			  if (abs(master->x - posX) > 5 ||
+				  abs(master->z - posZ) > 5)
+			  {
+				  printf("some error on path find...");
+			  }
 			  master->x = posX;
 			  master->z = posZ;
 			  master->dir = dir;
@@ -1167,6 +1184,11 @@ void QueueTest()
 			  {
 				  if (Move(master->x, master->z, x, z)) // map data check
 				  {
+					  if (abs(master->x - x) > 5 ||
+						  abs(master->z - z) > 5)
+					  {
+						  printf("some error on path find...");
+					  }
 					  master->x = x;
 					  master->z = z;
 					  ViewList::NotifyWalk(master->id, master->x, master->z, randNum);
@@ -1224,12 +1246,14 @@ void QueueTest()
 			  {
 				  printf("why master-target is null");
 				  master->state = 0; // stand
+				  resetMaster(master);
 				  master->target = NULL;
 				  break;
 			  }
 			  if (!needSend((master->target)))
 			  {
 				  master->state = 0; // stand
+				  resetMaster(master);
 				  master->target = NULL;
 				  break;
 			  }
@@ -1290,7 +1314,7 @@ void QueueTest()
 		  }
 
 		  static float theTime = t;
-		  if (t - theTime < 7)
+		  if (t - theTime < AIUpdateTime)
 		  {
 		  }
 		  else

@@ -7,7 +7,7 @@
 #include<stdlib.h>
 #define random(x) (rand()%x)
 #include "MapMgr.h"
-
+#include <math.h>
 
 void clearStream(LEUD::StreamFix &stream,  size_t seekLen);
 
@@ -53,12 +53,15 @@ void SkillUse(SOCKET client,Fight &f)
 	bool bfind = ViewList::find(f.attackerID, &player);
 	int errorcode = GUGGAME::OK;
 	int targetId = 0;
+	short tx=-1, tz=-1;
 	if (MapMgr::isPlayer(f.targetID))
 	{
 		bfind = ViewList::find(f.targetID, &target);
 		if (bfind)
 		{
 			targetId = target->id;
+			tx = target->x;
+			tz = target->z;
 		}
 	}
 	else
@@ -67,6 +70,8 @@ void SkillUse(SOCKET client,Fight &f)
 		if (bfind)
 		{
 			targetId = master->id;
+			tx = master->x;
+			tz = master->z;
 			if (master->dead > 0)
 			{
 				errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
@@ -80,32 +85,37 @@ void SkillUse(SOCKET client,Fight &f)
 
 
 	if (player != NULL &&
-		(targetId > 0||f.action==3||f.action==4) &&
+		(targetId > 0||f.action==SKILL_AREA_SELF||f.action==SKILL_AREA_ISLAND) &&
 		errorcode == GUGGAME::OK)
 	{
 
-		if (f.action == 0) // normal
+		if (f.action == SKILL_NORMAL) // normal
 		{
 			ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
 
 			int num = -random(10);
 			ViewList::attrchg(targetId, HP, num);
 		}
-		else if (f.action == 1) // magic
+		else if (f.action == SKILL_TRAIL) // magic
 		{
 			if (player->mp >= 10)
 			{
+				float speed = 10.0f;
 				int num = -random(50);
 				ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+				short x = (short)abs(player->x - tx);
+				short z = (short)abs(player->z - tz);
+				float delay = (float)(sqrt(x*x+z*z)) / speed;
+				short dd = (short)(delay * 1000);
 				ViewList::attrchg(player->id, MP, -10);
-				ViewList::attrchg(targetId, HP, num);
+				ViewList::attrchg(targetId, HP, num,dd);
 			}
 			else
 			{
 				errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
 			}
 		}
-		else if (f.action == 2) // areo magic
+		else if (f.action == SKILL_AREA_TARGET) // areo magic
 		{
 			if (player->mp <= 30)
 			{
@@ -149,7 +159,16 @@ void SkillUse(SOCKET client,Fight &f)
 				}
 			}
 		}
-		else if (3 == f.action)
+		else if (SKILL_AREA_SELF == f.action)
+		{
+			short areoX = player->x;
+			short areoZ = player->z;
+			char radius = 9;
+			int num = -random(200);
+			ViewList::attrchg(f.attackerID, MP, -30);
+			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+		}
+		else if (SKILL_AREA_ISLAND == f.action)
 		{
 			short areoX = f.parm01;
 			short areoZ = f.parm02;
@@ -158,7 +177,7 @@ void SkillUse(SOCKET client,Fight &f)
 			ViewList::attrchg(f.attackerID, MP, -30);
 			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
 		}
-		else if (4 == f.action) // shiled
+		else if (SKILL_SHILED == f.action) // shiled
 		{
 			if (player->mp >= 50)
 			{

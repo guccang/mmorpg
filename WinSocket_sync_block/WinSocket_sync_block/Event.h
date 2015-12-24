@@ -66,11 +66,11 @@ namespace GUGGAME
 		void OnAccept(void* params)
 		{
 			params = params;
-			if (_errorCode == WSAENOTSOCK)
+			//if (_errorCode == WSAENOTSOCK)
 			{
-				ViewList::remove(_socket,_errorCode);
+			//	ViewList::remove(_socket,_errorCode);
 			}
-			else if (_errorCode == WSAECONNABORTED)
+			//else if (_errorCode == WSAECONNABORTED)
 			{
 				ViewList::remove(_socket,_errorCode);
 			}
