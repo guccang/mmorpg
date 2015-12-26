@@ -750,6 +750,7 @@ void QueueTest()
 		  }
 	  }
 
+
 	  void ViewList::NotifyDyncMapObj(int playerID)
 	  {
 		  playerData* player = nullptr;
@@ -759,20 +760,20 @@ void QueueTest()
 		  {
 			  if (!needSend(&playerArray[i])) continue;
 
-			  for (int i = 0; i < player->dyncBlockCnt;++i)
+			  for (int j = 0; j < player->dyncBlockCnt;++j)
 			 {
 				 CreateObj c;
-				 c.id = player->dyncBlock[i].id;
+				 c.id = player->dyncBlock[j].id;
 				 if (!MapMgr::isDyncMapObj(c.id))
 				 {
 					 printf("send dyncmapobj id error %d",c.id);
 				 }
 				 c.type = CREATURE_DYNCMAPOBJ;
-				 c.x = player->dyncBlock[i].x;
-				 c.z = player->dyncBlock[i].z;
-				 c.dir = player->dyncBlock[i].dir;
+				 c.x = player->dyncBlock[j].x;
+				 c.z = player->dyncBlock[j].z; 
+				 c.dir = player->dyncBlock[j].dir;
 				 c.hp = 100000;
-				 SendStruct(player->sock, c, 1);
+				 SendStruct(playerArray[i].sock, c, 1);
 			 }
 		  }
 	  }
@@ -1436,6 +1437,19 @@ void QueueTest()
 		  }
 		  return false;
 	  }
+
+	  void ViewList::NotifyRemoveObj(int id)
+	  {
+		  DeleteObj del;
+		  del.id = id;
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (!needSend(&playerArray[i]))continue;
+
+			  SendStruct(playerArray[i].sock, del, 1);
+		  }
+	  }
+
 	  void ViewList::Update(float t)
 	  {
 		
@@ -1498,8 +1512,7 @@ void QueueTest()
 				  // playerUpdate
 				  for (int i = 0; i < 100;++i)
 				  {
-					  if (!isOnLine(playerArray[i])) continue;
-
+					  if (playerArray[i].flag == 0) continue;
 
 					  if (playerArray[i].dyncBlockCnt > 0)
 					  {
@@ -1515,16 +1528,14 @@ void QueueTest()
 									  continue;
 								  }
 								  clearDyncBlockFlag(dno.x, dno.z);
-								
-								  DeleteObj del;
-								  del.id = playerArray[i].dyncBlock[bcnt].id;
-								  SendStruct(playerArray[i].sock, del, 1);
+								  NotifyRemoveObj(playerArray[i].dyncBlock[bcnt].id);
 							  }
 							  playerArray[i].dyncBlockCnt = 0;
 							  playerArray[i].dyncBlockTime = 0;
 							  ZeroMemory(&playerArray[i].dyncBlock, sizeof(dyncNodeObj) * 30);
 						  }
 					  }
+					
 				  }
 				 
 			  }

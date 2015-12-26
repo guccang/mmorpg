@@ -122,6 +122,7 @@ public:
 	static void attrchg(int id, int type, int num,short delay=0);
 	static void addDyncBlock(int id);
 	static void attrchgAreo(int* targets, int num, int type, int demage);
+	static void NotifyRemoveObj(int id);
 	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
 	static void NotifyMasterAttrInit(int id);

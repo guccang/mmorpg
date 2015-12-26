@@ -70,17 +70,11 @@
      <Compile Include="Assets\Scripts\performance\NetPerformance.cs" />
      <Compile Include="Assets\Scripts\performance\localIO.cs" />
      <Compile Include="Assets\Scripts\test.cs" />
- <Reference Include="UnityEngine.Advertisements">
- <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
- </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>
  <Reference Include="UnityEngine.Networking">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Networking/UnityEngine.Networking.dll</HintPath>
- </Reference>
- <Reference Include="UnityEngine.Analytics">
- <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityAnalytics/UnityEngine.Analytics.dll</HintPath>
  </Reference>
  <Reference Include="unityNetCPlusPlus">
  <HintPath>C:/Users/tingjun/Documents/GitHub/MMORPG_Verify/clientUnity/MMORPG-Verification/Assets/Plugin/unityNetCPlusPlus.dll</HintPath>
