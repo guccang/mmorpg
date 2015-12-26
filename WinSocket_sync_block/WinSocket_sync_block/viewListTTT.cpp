@@ -7,6 +7,7 @@
 #include "Event.h"
 #include<stdio.h>
 #include<stdlib.h>
+#include <math.h>
 
 #include "AStart.h"
 #define randomDW(x) (-rand()%x + (short)(x*0.5))
@@ -20,13 +21,37 @@ short AIUpdateTime = 7;
 using namespace GUGGAME;
 void act_2_utf8(const char* src, size_t src_len, char* des, size_t des_len);
 
-enum MAPOBJ
+direction Direction[8] =
 {
-	HERO=0,
-	OTHERPLAYER=1,
-	MASTER1=2,
-	MASTER2=3,
-	MASTERBOSS=4,
+	{ 0, 1 },
+	{ 1, 1 },
+	{ 1, 0 },
+	{ 1, -1},
+	{ 0, -1 },
+	{ -1, -1 },
+	{ -1, 0 },
+	{ -1, 1 },
+};
+direction DirectionVertical[8] =
+{
+	{ 1, 0 },
+	{ 1, -1 },
+	{ 0, -1 },
+	{ -1, -1 },
+	{ -1, 0 },
+	{ -1, 1 },
+	{ 0, 1 },
+	{ 1, 1 },
+};
+
+enum ENUM_CREATURE_ID
+{
+	CREATURE_HERO=0,
+	CREATURE_OTHERPLAYER=1,
+	CREATURE_MASTER1=2,
+	CREATURE_MASTER2=3,
+	CREATURE_MASTERBOSS=4,
+	CREATURE_DYNCMAPOBJ = 5,
 };
 
 enum BLOCK
@@ -94,7 +119,10 @@ void clearMoveFlag(short x, short z)
 {
 	ViewList::mapDataEx[getIndex(x, z)] &= ~BK_MASTER;
 }
-
+void clearDyncBlockFlag(short x, short z)
+{
+	ViewList::mapDataEx[getIndex(x, z)] &= ~BK_MASTER;
+}
 bool checkPos(short x, short z)
 {
 	if (x < 0) return false;
@@ -108,6 +136,31 @@ bool canMove(short x, short z)
 {
 	return false==ViewList::isBlock(x,z);
 }
+
+
+BLOCK getBlock(short x, short z)
+{
+	if (checkPos(x,z))
+	{
+		return (BLOCK)ViewList::mapDataEx[getIndex(x, z)];
+	}
+	return BK_ISLAND;
+}
+
+
+void setBlock(short x, short z, BLOCK bk)
+{
+	if (checkPos(x, z) && getBlock(x, z) != BK_ISLAND)
+	{
+		ViewList::mapDataEx[getIndex(x, z)] |= bk;
+	}
+}
+
+void clearBlock(short x, short z, BLOCK bk)
+{
+	ViewList::mapDataEx[getIndex(x, z)] &= ~bk;
+}
+
 
 bool Move(short x, short z, short x1, short z1)
 {
@@ -178,9 +231,9 @@ void ViewList::masterInit()
  BOSS£º14,12
  */
 	//hatchArray[0].init(1, 20, 0, 100, 100,"´¨É£");
-	hatchArray[1].init(MASTER1, 50, 23, 7, 12, "±©±©");
-	hatchArray[2].init(MASTER2, 31, 23, 7, 12, "ÁúÁú");
-	hatchArray[3].init(MASTERBOSS, 14, 12, 3, 1, "ÁÁÁÁ");
+	hatchArray[1].init(CREATURE_MASTER1, 50, 23, 7, 12, "±©±©");
+	hatchArray[2].init(CREATURE_MASTER2, 31, 23, 7, 12, "ÁúÁú");
+	hatchArray[3].init(CREATURE_MASTERBOSS, 14, 12, 3, 1, "ÁÁÁÁ");
 	//hatchArray[4].init(5, -10, -10, 100, 100, "Ð¡Ã÷");
 }
 void ViewList::mapInit()
@@ -273,7 +326,7 @@ void QueueTest()
 		 {
 			 db->flag = 1;
 			 db->hp = 1000;
-			 db->mp = 100;
+			 db->mp = 1000;
 			 db->def = 10;
 			 db->onLine = 0;
 			 strcpy_s(db->name, name);
@@ -314,6 +367,9 @@ void QueueTest()
 			db->dir = dir;
 			db->flag = 1;
 			db->mapid = 0;
+			ZeroMemory(&db->dyncBlock, sizeof(dyncNodeObj) * 30);
+			db->dyncBlockTime = 0;
+			db->dyncBlockCnt = 0;
 		}
 		return 0;
 	 }
@@ -400,7 +456,7 @@ void QueueTest()
 
 		  CreateObj c;
 		  c.id = db->id;
-		  c.type = HERO;
+		  c.type = CREATURE_HERO;
 		  c.x = bornX;
 		  c.z = bornZ;
 		  c.dir = 0;
@@ -416,7 +472,7 @@ void QueueTest()
 		  SendStruct((SOCKET)sock, att, 1);
 
 		  NotifyMapInfo(db->id);
-		  NotifyCreate(db->id, OTHERPLAYER, bornX, bornZ, 0);
+		  NotifyCreate(db->id, CREATURE_OTHERPLAYER, bornX, bornZ, 0);
 		  return 0;
 	  }
 
@@ -465,6 +521,14 @@ void QueueTest()
 		  //return abs(nx) + abs(nz) + 0.3f;
 		  //return float(nx*nx + nz*nz);
 		  return max(nx, nz);
+	  }
+
+	  double distance3D(short x, short z, short x1, short z1)
+	  {
+		  int nx = (x - x1);
+		  int nz = (z - z1);
+
+		  return sqrt(nx*nx + nz*nz);
 	  }
 
 	  int len(masterData* master, masterData* target)
@@ -573,7 +637,7 @@ void QueueTest()
 			{
 				CreateObj c;
 				c.id = id;
-				c.type = OTHERPLAYER;
+				c.type = CREATURE_OTHERPLAYER;
 				c.x = x;
 				c.z = z;
 				c.dir = dir;
@@ -590,7 +654,7 @@ void QueueTest()
 			// other player to new Player
 			CreateObj cc;
 			cc.id = playerArray[i].id;
-			cc.type = OTHERPLAYER; // player
+			cc.type = CREATURE_OTHERPLAYER; // player
 			cc.x = playerArray[i].x;
 			cc.z = playerArray[i].z;
 			cc.dir = playerArray[i].dir;
@@ -683,6 +747,33 @@ void QueueTest()
 				  f.action = action;
 				  SendStruct((SOCKET)playerArray[i].sock, f, 1);
 			  }
+		  }
+	  }
+
+	  void ViewList::NotifyDyncMapObj(int playerID)
+	  {
+		  playerData* player = nullptr;
+		  bool bfind = find(playerID, &player);
+		  if (false == bfind) return;
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (!needSend(&playerArray[i])) continue;
+
+			  for (int i = 0; i < player->dyncBlockCnt;++i)
+			 {
+				 CreateObj c;
+				 c.id = player->dyncBlock[i].id;
+				 if (!MapMgr::isDyncMapObj(c.id))
+				 {
+					 printf("send dyncmapobj id error %d",c.id);
+				 }
+				 c.type = CREATURE_DYNCMAPOBJ;
+				 c.x = player->dyncBlock[i].x;
+				 c.z = player->dyncBlock[i].z;
+				 c.dir = player->dyncBlock[i].dir;
+				 c.hp = 100000;
+				 SendStruct(player->sock, c, 1);
+			 }
 		  }
 	  }
 
@@ -865,7 +956,7 @@ void QueueTest()
 		  for (int i = 0; i < 500; ++i)
 		  {
 			  if (masterArray[i].flag != 1 || masterArray[i].dead>0) continue;
-			  if (distance(x, z, masterArray[i].x, masterArray[i].z) <= dis)
+			  if (distance3D(x, z, masterArray[i].x, masterArray[i].z) <= dis)
 			  {
 				  num++;
 				  masterArray[i].target = player;
@@ -873,7 +964,7 @@ void QueueTest()
 				  attrchg(masterArray[i].id, HP, demage);
 			  }
 		  }
-		  printf("master num:%d\n",num);
+		  printf("Area Demage master num:%d\n",num);
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  if (!needSend(&playerArray[i])) continue;
@@ -886,7 +977,63 @@ void QueueTest()
 			  }
 		  }
 	  }
+
+	  int setDyncBlockData(playerData* player,int index,short x,short z)
+	  {
+		  if (!checkPos(x, z) || getBlock(x,z)==BK_ISLAND || index>=30) return index;
+		  player->dyncBlock[index].id = MapMgr::generateID(ENUM_MAPOBJ_DYNCMAPOBJ);
+		  player->dyncBlock[index].x = x;
+		  player->dyncBlock[index].z = z;
+		  player->dyncBlock[index].dir = player->dir;
+		  setBlock(x, z, BK_MASTER);
+		  player->dyncBlockCnt++;
+		  index++;
+		  return index;
+	  }
 	
+	  void ViewList::addDyncBlock(int id)
+	  {
+		  CriticalSection::Lock lock(m_lock);
+		  // sync player data £¬ sync dync block
+		  printf("addDyncBlock %d",id);
+		  playerData* player = NULL;
+		  bool bfind = find(id,&player);
+		  if (false == bfind) return;
+		  if (!needSend(player)) return;
+		  if (player->dir < 0 || player->dir>8) return;
+		  if (player->dyncBlockCnt > 0) return;
+
+
+		   char r = 5;
+		   char len = 13;
+		   int blockTime = 10000; // ms
+		   direction dirV = DirectionVertical[player->dir];
+		   direction dir = Direction[player->dir];
+		  short x1 = (short)ceil(player->x + 0.7f*r*dir.x);
+		  short z1 = (short)ceil(player->z + 0.7f*r*dir.z);
+		  short x = 0, z = 0;
+		  int index = 0;
+		  index = setDyncBlockData(player,index, x1, z1);
+		  index = setDyncBlockData(player,index, x1 + 1, z1);
+		  for (short i = 1; i<len; ++i)
+		  {
+			  //right
+			  x = x1 + dirV.x*i;
+			  z = z1 + dirV.z*i;
+			  //if (getBlock(x,z) == BK_ISLAND) continue;
+			  index = setDyncBlockData(player, index, x, z);
+			  index = setDyncBlockData(player, index, x+1, z);
+
+			  //left
+			  x = x1 - dirV.x*i;
+			  z = z1 - dirV.z*i;
+			  index = setDyncBlockData(player, index, x, z);
+			  index = setDyncBlockData(player, index, x + 1, z);
+		  }
+		  player->dyncBlockTime =  blockTime;
+		  NotifyDyncMapObj(player->id);
+	  }
+
 	  void ViewList::attrchg(int id, int type, int num,short delay)
 	  {
 		  CriticalSection::Lock lock(m_lock);
@@ -1312,15 +1459,16 @@ void QueueTest()
 				  continue;
 			  }
 		  }
-
-		  static float theTime = t;
-		  if (t - theTime < AIUpdateTime)
+		  static float theTime = 0;
+		  float els = t - theTime;
+		  if (els< AIUpdateTime)
 		  {
 		  }
 		  else
 		  {
 			  theTime = t;
 			  CriticalSection::Lock lock(m_lock);
+			  // master update
 			  for (int i = 0; i < 500; ++i)
 			  {
 				  if (masterArray[i].flag != 1) continue;
@@ -1345,6 +1493,38 @@ void QueueTest()
 					  // fight the palyer
 					  // moving around.
 					  AI(master);
+				  }
+
+				  // playerUpdate
+				  for (int i = 0; i < 100;++i)
+				  {
+					  if (!isOnLine(playerArray[i])) continue;
+
+
+					  if (playerArray[i].dyncBlockCnt > 0)
+					  {
+						  if ((playerArray[i].dyncBlockTime -= els) < 0)
+						  {
+							  // delete dyncBlock
+							  for (int bcnt = 0; bcnt < playerArray[i].dyncBlockCnt;++bcnt)
+							  {
+								  dyncNodeObj &dno = playerArray[i].dyncBlock[bcnt];
+								  if (!MapMgr::isDyncMapObj(dno.id))
+								  {
+									  printf("why~~~~~~....dyncNodeObj Id Error:%d", dno.id);
+									  continue;
+								  }
+								  clearDyncBlockFlag(dno.x, dno.z);
+								
+								  DeleteObj del;
+								  del.id = playerArray[i].dyncBlock[bcnt].id;
+								  SendStruct(playerArray[i].sock, del, 1);
+							  }
+							  playerArray[i].dyncBlockCnt = 0;
+							  playerArray[i].dyncBlockTime = 0;
+							  ZeroMemory(&playerArray[i].dyncBlock, sizeof(dyncNodeObj) * 30);
+						  }
+					  }
 				  }
 				 
 			  }

@@ -9,10 +9,36 @@
 		 short x;
 		 short z;
 	 };
+	 struct direction
+	 {
+		 short x;
+		 short z;
+	 };
+	 struct dyncNodeObj
+	 {
+		 int id;
+		 short x;
+		 short z;
+		 char dir;
+	 };
+	 enum ENUM_DIRECTION
+	 {
+		 UP,
+		 UP_RIGHT,
+		 RIGHT,
+		 RIGHT_DOWN,
+		 DOWN,
+		 DOWN_LELF,
+		 LEFT,
+		 LEFT_UP,
+	 };
+	
  }
 class hatch;
 extern short bornX;
 extern short bornZ;
+extern direction Direction[8];
+
 enum ENUM_ATTR
 {
 	HP = 0,
@@ -27,11 +53,13 @@ enum ENUM_SKILL_TYPE
 	SKILL_AREA_SELF=3,
 	SKILL_AREA_ISLAND=4,
 	SKILL_SHILED=5,
+	SKILL_DYNCBLOCK = 6,
 };
 class mapObj
 {
 
 };
+
 struct playerData : public mapObj
 {
 	int onLine;
@@ -49,6 +77,9 @@ struct playerData : public mapObj
 	int shield; //»¤¶Ü
 	int flag; // 1 use
 	int mapid;
+	dyncNodeObj dyncBlock[30];
+	int dyncBlockTime;
+	char dyncBlockCnt;
 };
 
 struct masterData : public mapObj
@@ -89,6 +120,7 @@ public:
 	static int add(int sock, short x,short y, char dir,const char*name,const char*pwd);
 	static void remove(SOCKET socke,int errorCode);
 	static void attrchg(int id, int type, int num,short delay=0);
+	static void addDyncBlock(int id);
 	static void attrchgAreo(int* targets, int num, int type, int demage);
 	static void NotifyJump(int id,short x,short y,char dir);
 	static void NotifyAttrInit(int id,int hp,int mp,int def);
@@ -99,6 +131,7 @@ public:
 	static void NotifyAttrChg(int id,int attr, int num,short delay=0);
 	static void NotifyMasterCreate(int id, short x, short y, char dir);
 	static void NotifyMapInfo(int id);
+	static void NotifyDyncMapObj(int playerID);
 	static bool getNearestPlayer(masterData* master,playerData** freeData);
 	static bool getNearestMaster(masterData* master, masterData** freeData);
 	static void areoDamage(short x, short z, char radius,int demage,int attackID,short action);

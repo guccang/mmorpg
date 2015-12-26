@@ -85,7 +85,7 @@ void SkillUse(SOCKET client,Fight &f)
 
 
 	if (player != NULL &&
-		(targetId > 0||f.action==SKILL_AREA_SELF||f.action==SKILL_AREA_ISLAND) &&
+		(targetId > 0||f.action==SKILL_AREA_SELF||f.action==SKILL_AREA_ISLAND || f.action==SKILL_DYNCBLOCK) &&
 		errorcode == GUGGAME::OK)
 	{
 
@@ -184,6 +184,15 @@ void SkillUse(SOCKET client,Fight &f)
 				ViewList::attrchg(f.attackerID, MP, -50);
 				player->shield = 5000;
 				ViewList::attrchg(f.attackerID, SHIELD, player->shield);
+			}
+		}
+		else if (SKILL_DYNCBLOCK == f.action) // dync block
+		{
+			if (player->mp >= 60)
+			{
+				ViewList::attrchg(f.attackerID, MP, -60);
+				// dync block create 
+				ViewList::addDyncBlock(f.attackerID);
 			}
 		}
 	}

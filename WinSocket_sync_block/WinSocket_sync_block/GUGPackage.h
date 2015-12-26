@@ -331,6 +331,7 @@ namespace GUGGAME
 		CreateObj()
 		{
 			no = 2002;
+			name[0] = 0;
 		}
 	};
 	template<class T> inline T& operator<<(T& stream, const CreateObj& data)

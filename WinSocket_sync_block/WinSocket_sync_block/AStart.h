@@ -198,7 +198,8 @@ int  findPath(short x, short z,short tx,short tz, pathNode* path)
 		path[i].z = node->z;
 		i++;
 	}
-	printf("path node : %d\n", i);
+	if (i>20)
+		printf("path node : %d\n", i);
 
 	return i;
 }

@@ -44,7 +44,7 @@ struct session
 int _tmain(int argc, _TCHAR* argv[])
 {
 	printf("=========================\n");
-	printf("GAME SERVER VERIFY V1.9\n");
+	printf("GAME SERVER VERIFY V2.0\n");
 	printf("=========================\n");
 
 	argc = argc;
