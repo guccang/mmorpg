@@ -96,7 +96,7 @@ void Update(float t)
 	}
 	catch (...)
 	{
-		printf("not fixed memroy exception:");
+		printf("not fixed logic Update");
 	}
 }
 /*

@@ -39,7 +39,9 @@ public class JFPackage
 		CREATE=2002,
 		DELETE=2003,
 		ENTRPMAP = 2004,
-
+		RELIVE = 2005,
+		NOTIFY=2006,
+		LISTKILL = 2007,
 		// Login
 		LOGIN = 3000,
 		REGIST=3001,
@@ -230,8 +232,8 @@ public class JFPackage
 
 		public short _param01;
 		public short _param02;
-		
-		public PAG_FIGHT(int id,short target,short action)
+		public int _order;
+		public PAG_FIGHT(int id,int target,short action)
 		{
 			header = JFTools.size(typeof(PAG_FIGHT));
 			len = 0;
@@ -242,6 +244,7 @@ public class JFPackage
 			_action = action; 
 			_param01 = 0;
 			_param02 = 0;
+			_order = 0;
 		}
 	}
 
@@ -282,18 +285,20 @@ public class JFPackage
 		public  short HEAD{get{return JFTools.size(typeof(PAG_REGIST));}}
 		public  short LEN{get{return 0;}}
 		public uint ID{get{ return (uint)MSG_ID.REGIST;}}
-		
+
+		public byte _bAuto;
 		[MarshalAs(UnmanagedType.ByValArray,SizeConst=16)]
 		public byte[] _name; // name maxLenght 8
 		[MarshalAs(UnmanagedType.ByValArray,SizeConst=32)]
 		public byte[] _pwd; // pwd maxLenght 16
 		
-		public PAG_REGIST(byte[] name,byte[] pwd )
+		public PAG_REGIST(byte bAuto,byte[] name,byte[] pwd )
 		{
 			header = JFTools.size(typeof(PAG_REGIST));
 			len = 0;
 			no = (uint)MSG_ID.REGIST;
-			
+
+			_bAuto =  bAuto;
 			_name = name;
 			_pwd   = pwd;
 		}
@@ -315,7 +320,6 @@ public class JFPackage
 		public short _x;	   //  pos x
 		public short _z;   //  pos z
 		public byte _dir;  // direction
-		public int  _hp;
 		[MarshalAs(UnmanagedType.ByValArray,SizeConst=16)]
 		public byte[] _name; // name maxLenght 8
 
@@ -330,7 +334,6 @@ public class JFPackage
 			_x = x;
 			_z = z;
 			_dir  = dir;
-			_hp = hp;
 			_name = name;
 		}
 	}
@@ -398,20 +401,26 @@ public class JFPackage
 		public  short LEN{get{return 0;}}
 		public uint ID{get{ return (uint)MSG_ID.ATTRCHG;}}
 		
-		public int _id;
+		public int _attackID;
+		public int _targetID;
+		public short _action;
 		public short _type;
 		public short _num;
 		public short _delay;
-		public PAG_ATTRCHG(int id , short type , short num ,short delay)
+		public int _order;
+		public PAG_ATTRCHG(int attID ,int tarID,short action ,short type , short num ,short delay)
 		{
 			header = JFTools.size(typeof(JFPackage.PAG_ATTRCHG));
 			len = 0;
 			no = (uint)MSG_ID.ATTRCHG;
 
-			_id = id;
+			_attackID = attID;
+			_targetID = tarID;
+			_action = action;
 			_type = type;
 			_num = num;
 			_delay = delay;
+			_order = 0;
 		}
 	}
 
@@ -429,10 +438,14 @@ public class JFPackage
 		public uint ID{get{ return (uint)MSG_ID.ATTR;}}
 		
 		public int _id;
+		public int _maxHp;
+		public int _maxMp;
+		public int _maxShiled;
 		public int _hp;
 		public int _mp;
+		public int _shiled;
 		public int _def;
-		public PAG_ATTR(int id , int hp ,int mp,int def)
+		public PAG_ATTR(int id , int maxHp,int maxMp,int hp ,int mp,int def)
 		{
 			header = JFTools.size(typeof(JFPackage.PAG_ATTR));
 			len = 0;
@@ -442,6 +455,10 @@ public class JFPackage
 			_hp = hp;
 			_mp = mp;
 			_def = def;
+			_maxHp = maxHp;
+			_maxMp = maxMp;
+			_maxShiled = 0;
+			_shiled = 0;
 		}
 	}
 
@@ -527,4 +544,99 @@ public class JFPackage
 		}
 	}
 
+	[System.Serializable]
+	[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi,Pack = 1)]
+	public struct PAG_RELIVE :IPackage
+	{
+		public short   header;
+		public short   len;
+		public uint     no;
+		public  short HEAD{get{return JFTools.size(typeof(PAG_RELIVE));}}
+		public  short LEN{get{return 0;}}
+		public uint ID{get{ return (uint)MSG_ID.RELIVE;}}
+		
+		public PAG_RELIVE(int mapid)
+		{
+			header = JFTools.size(typeof(PAG_RELIVE));
+			len = 0;
+			no = (uint)MSG_ID.RELIVE;
+		}
+	}
+
+
+	[System.Serializable]
+	[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi,Pack = 1)]
+	public struct PAG_Notify :  IPackage
+	{
+		public short   header;
+		public short   len;
+		public uint     no;
+		public  short HEAD{get{return JFTools.size(this.GetType());}}
+		public  short LEN{get{return 0;}}
+		public uint ID{get{ return (uint)MSG_ID.NOTIFY;}}
+
+		public byte _type; // 0单独  1 广播
+		[MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+		public  byte[] _attack;
+		[MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+		public  byte[] _target;
+		public PAG_Notify(byte[]  attack,byte[] target)
+		{
+			header = JFTools.size(typeof(PAG_Notify));
+			len = 0;
+			no = (uint)MSG_ID.NOTIFY;
+			_type = 0;
+			_attack = attack;
+			_target = target;
+		}
+	}; 
+
+
+
+	//结构体序列化
+	[System.Serializable]
+	//4字节对齐 iphone 和 android上可以1字节对齐
+	[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi,Pack = 1)]
+	public struct killBeKilledData 
+	{
+		public int _id;
+		public short _killed;
+		public short _beKilled;
+		[MarshalAs(UnmanagedType.ByValArray,SizeConst=16)]
+		public byte[] _name;
+		
+		public killBeKilledData(int id,short killed,short beKilled,byte[] name)
+		{
+			_id = id;
+			_killed = killed;
+			_beKilled = beKilled;
+			_name = name;
+		}
+	}
+	//结构体序列化
+	[System.Serializable]
+	//4字节对齐 iphone 和 android上可以1字节对齐
+	[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi,Pack = 1)]
+	public struct PAG_ListKill : IPackage
+	{
+		public short   header;
+		public short   len;
+		public uint     no;
+		public  short HEAD{get{return JFTools.size(this.GetType());}}
+		public  short LEN{get{return 0;}}
+		public uint ID{get{ return (uint)MSG_ID.LISTKILL;}}
+		
+		public int _cnt;
+		[MarshalAs(UnmanagedType.ByValArray, SizeConst =  256)]
+		public byte[] _inner;
+		
+		public PAG_ListKill(byte cnt)
+		{
+			_cnt = cnt;
+			_inner = new byte[0];
+			header = JFTools.size(typeof(PAG_ListKill));
+			len = 0;
+			no = (uint)MSG_ID.LISTKILL;
+		}
+	}
 }

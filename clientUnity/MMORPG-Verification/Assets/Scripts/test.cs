@@ -13,6 +13,7 @@ public class test : MonoBehaviour {
 	string regName="";
 	string pwd = "";
 	string selfInfo = "";
+	string selfInfoEx = "";
 	string targetInfo = "";
 	public controller HeroCtr
 	{
@@ -168,7 +169,12 @@ public class test : MonoBehaviour {
 			pwd = GUI.PasswordField(new Rect(buttonW*2, gapVal+gapH, buttonW, buttonH),pwd,'*');
 			if (GUI.Button(new Rect(0, gapVal += gapH, buttonW, buttonH), "regist"))
 			{
-				JFPackage.PAG_REGIST regist = new JFPackage.PAG_REGIST(StringEncoding.GetBytes(regName),StringEncoding.GetBytes(pwd));
+				JFPackage.PAG_REGIST regist = new JFPackage.PAG_REGIST(0,StringEncoding.GetBytes(regName),StringEncoding.GetBytes(pwd));
+				NetMgr.getSingleton().sendMsg(regist);
+			}
+			if (GUI.Button(new Rect(0, gapVal += gapH, buttonW, buttonH), "autoregist"))
+			{
+				JFPackage.PAG_REGIST regist = new JFPackage.PAG_REGIST(1,StringEncoding.GetBytes(regName),StringEncoding.GetBytes(pwd));
 				NetMgr.getSingleton().sendMsg(regist);
 			}
 			if (GUI.Button(new Rect(0, gapVal += gapH, buttonW, buttonH), "login"))
@@ -194,14 +200,21 @@ public class test : MonoBehaviour {
 				//if(NetMgr.getSingleton().isConnected())
 					NetMgr.getSingleton().disConnect();
 			}
+			if (GUI.Button(new Rect(0, gapVal += gapH, buttonW, buttonH), "relive"))
+			{
+				JFPackage.PAG_RELIVE re = new JFPackage.PAG_RELIVE(11);
+				NetMgr.getSingleton().sendMsg(re);
+			}
 			// name,hp,mp,def
 
 			Creature target = Hero.Target;
-			selfInfo = Hero._name + ":" + Hero.hp + ":" +Hero.shiled +":"+Hero.mp + ":" + Hero.def ;
+			selfInfo = Hero._name +":" +Hero.shiled +":"+Hero.hp +  ":"+Hero.mp + ":" + "(" + Hero.ctl.curPos._x + ":" + Hero.ctl.curPos._z + ")";
+			selfInfoEx = Hero.maxHp + ":" + Hero.maxMp;
 			if(target!=null)
-					targetInfo = target._name + ":" + target.hp + ":" +target.mp + ":" + target.def ;
+					targetInfo = target._name + ":"+target.shiled +":" + target.maxHp + ":" +target.hp + ":" +target.maxMp+":"+target.mp+"("+ target.ctl.curPos._x+":"+target.ctl.curPos._z+")";
 
 			GUI.Label(new Rect(0,gapVal+=gapH,buttonW*2,buttonH),selfInfo);
+			GUI.Label(new Rect(0,gapVal+=gapH,buttonW*2,buttonH),selfInfoEx);
 			GUI.Label(new Rect(0,gapVal+=gapH,buttonW*2,buttonH),targetInfo);
 		}
 		GUI.Label(new Rect(0,gapVal+=gapH,buttonW*3,buttonH*2),GameDebug.lastError);

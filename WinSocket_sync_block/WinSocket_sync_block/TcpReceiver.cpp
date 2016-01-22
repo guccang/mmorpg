@@ -10,6 +10,8 @@
 #include <math.h>
 
 void clearStream(LEUD::StreamFix &stream,  size_t seekLen);
+int heroMinAtt = 445 ;
+int heroMaxAtt = 506;
 
 int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
 {
@@ -40,6 +42,16 @@ int recvProcess(LPPER_IO_DATA perIOData, int recvLen )
 	return 0;
 }
 
+bool needTarget(short action)
+{
+	if (action == SKILL_AREA_SELF ||
+		action == SKILL_AREA_ISLAND ||
+		action == SKILL_SHILED)
+		return false;
+
+	return true;
+}
+
 void SkillUse(SOCKET client,Fight &f)
 {
 	if (f.action == 999)
@@ -51,64 +63,89 @@ void SkillUse(SOCKET client,Fight &f)
 	playerData *target = NULL;
 	masterData *master = NULL;
 	bool bfind = ViewList::find(f.attackerID, &player);
+	if (bfind)
+	{
+		if (player->hp <= 0)
+		{
+			return;
+		}
+	}
+
 	int errorcode = GUGGAME::OK;
 	int targetId = 0;
 	short tx=-1, tz=-1;
-	if (MapMgr::isPlayer(f.targetID))
+	if (needTarget(f.action))
 	{
-		bfind = ViewList::find(f.targetID, &target);
-		if (bfind)
+		if (MapMgr::isPlayer(f.targetID))
 		{
-			targetId = target->id;
-			tx = target->x;
-			tz = target->z;
-		}
-	}
-	else
-	{
-		bfind = ViewList::find(f.targetID, &master);
-		if (bfind)
-		{
-			targetId = master->id;
-			tx = master->x;
-			tz = master->z;
-			if (master->dead > 0)
+			bfind = ViewList::find(f.targetID, &target);
+			if (bfind)
 			{
-				errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
-			}
-			else
-			{
-				master->target = player;
+				if (target->hp <= 0)
+				{
+					errorcode = ERROR_FIGHT_TARGET_DEAD;
+				}
+				else
+				{
+					targetId = target->id;
+					tx = target->x;
+					tz = target->z;
+				}
 			}
 		}
+		else
+		{
+			bfind = ViewList::find(f.targetID, &master);
+			if (bfind)
+			{
+				targetId = master->id;
+				tx = master->x;
+				tz = master->z;
+				if (master->dead > 0)
+				{
+					errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
+				}
+				else
+				{
+					if (NULL == master->target)
+						master->target = player;
+					else
+					{
+						int rNum = random(3);
+						if (0 == rNum)
+							master->target = player;
+					}
+				}
+			}
+		}
 	}
+	
 
 
-	if (player != NULL &&
-		(targetId > 0||f.action==SKILL_AREA_SELF||f.action==SKILL_AREA_ISLAND || f.action==SKILL_DYNCBLOCK) &&
+	if (player != NULL&&
+		((needTarget(f.action)&&targetId>0)||needTarget(f.action)==false)&&
 		errorcode == GUGGAME::OK)
 	{
-
 		if (f.action == SKILL_NORMAL) // normal
 		{
-			ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+			ViewList::NotifyFight(f.attackerID, f.targetID, f.action,f.order);
 
-			int num = -random(10);
-			ViewList::attrchg(targetId, HP, num);
+			int num = ViewList::calcDeamge(heroMinAtt, heroMaxAtt, SKILL_NORMAL);
+			ViewList::attrchg(f.attackerID,targetId,f.action, HP, num,0,f.order);
 		}
 		else if (f.action == SKILL_TRAIL) // magic
 		{
 			if (player->mp >= 10)
 			{
 				float speed = 10.0f;
-				int num = -random(50);
-				ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
+				int num = ViewList::calcDeamge(heroMinAtt, heroMaxAtt, SKILL_TRAIL);
+				ViewList::NotifyFight(f.attackerID, f.targetID, f.action,f.order);
 				short x = (short)abs(player->x - tx);
 				short z = (short)abs(player->z - tz);
 				float delay = (float)(sqrt(x*x+z*z)) / speed;
 				short dd = (short)(delay * 1000);
-				ViewList::attrchg(player->id, MP, -10);
-				ViewList::attrchg(targetId, HP, num,dd);
+				ViewList::attrchg(f.attackerID,player->id,f.action, MP, -10,0,f.order);
+				ViewList::attrchg(f.attackerID, targetId, f.action, HP, num, dd, f.order);
 			}
 			else
 			{
@@ -133,10 +170,11 @@ void SkillUse(SOCKET client,Fight &f)
 					{
 						short areoX = master->x;
 						short areoZ = master->z;
-						char radius = 9;
+						char radius = 2;
 						int num = -random(100);
-						ViewList::attrchg(f.attackerID, MP, -30);
-						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+						ViewList::NotifyFight(f.attackerID, f.targetID, f.action,f.order);
+						ViewList::attrchg(f.attackerID, f.attackerID, f.action, MP, -30, 0,f.order);
+						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action,f.order);
 					}
 				}
 				else if (MapMgr::isPlayer(targetId)) // select player/self
@@ -147,10 +185,11 @@ void SkillUse(SOCKET client,Fight &f)
 					{
 						short areoX = targetPlayer->x;
 						short areoZ = targetPlayer->z;
-						char radius = 9;
+						char radius = 2;
 						int num = -random(200);
-						ViewList::attrchg(f.attackerID, MP, -30);
-						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+						ViewList::NotifyFight(f.attackerID, f.targetID, f.action,f.order);
+						ViewList::attrchg(f.attackerID, f.attackerID, f.action, MP, -30,0, f.order);
+						ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action,f.order);
 					}
 					else
 					{
@@ -163,34 +202,38 @@ void SkillUse(SOCKET client,Fight &f)
 		{
 			short areoX = player->x;
 			short areoZ = player->z;
-			char radius = 9;
-			int num = -random(200);
-			ViewList::attrchg(f.attackerID, MP, -30);
-			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+			char radius = 2;
+			int num = ViewList::calcDeamge(heroMinAtt, heroMaxAtt, SKILL_AREA_SELF);
+			ViewList::NotifyFight(f.attackerID, -1, f.action,f.order);
+			ViewList::attrchg(f.attackerID, f.attackerID, f.action, MP, -30, 0,f.order);
+			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action,f.order);
 		}
 		else if (SKILL_AREA_ISLAND == f.action)
 		{
 			short areoX = f.parm01;
 			short areoZ = f.parm02;
-			char radius = 9;
-			int num = -random(200);
-			ViewList::attrchg(f.attackerID, MP, -30);
-			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action);
+			char radius = 2;
+
+			int num = ViewList::calcDeamge(heroMinAtt, heroMaxAtt, SKILL_AREA_ISLAND);
+			ViewList::NotifyFight(f.attackerID, -1, f.action,f.order,areoX,areoZ);
+			ViewList::attrchg(f.attackerID, f.attackerID, f.action, MP, -30,0, f.order);
+			ViewList::areoDamage(areoX, areoZ, radius, num, f.attackerID, f.action,f.order);
 		}
 		else if (SKILL_SHILED == f.action) // shiled
 		{
 			if (player->mp >= 50)
 			{
-				ViewList::attrchg(f.attackerID, MP, -50);
-				player->shield = 5000;
-				ViewList::attrchg(f.attackerID, SHIELD, player->shield);
+				ViewList::NotifyFight(f.attackerID, f.targetID, f.action,f.order);
+				ViewList::attrchg(f.attackerID,f.attackerID,f.action, MP, -50);
+				player->shield = 3000;
+				ViewList::attrchg(f.attackerID, f.attackerID, f.action, SHIELD, player->shield, 0,f.order);
 			}
 		}
 		else if (SKILL_DYNCBLOCK == f.action) // dync block
 		{
 			if (player->mp >= 60)
 			{
-				ViewList::attrchg(f.attackerID, MP, -60);
+				ViewList::attrchg(f.attackerID, f.attackerID, f.action, MP, -60,0, f.order);
 				// dync block create 
 				ViewList::addDyncBlock(f.attackerID);
 			}
@@ -210,6 +253,7 @@ void SkillUse(SOCKET client,Fight &f)
 		SendStruct(client, ec, 1);
 	}
 }
+
 
 void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 {
@@ -276,8 +320,11 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 				Walk w;
 				stream >> w;
 				//w.sock = (short)perIOData->client;
-				SendStruct(client, w, 1);
-				ViewList::NotifyWalk(w.id, w.x, w.z, w.dir);
+				if (!ViewList::isDead(ViewList::getID(client)))
+				{
+					SendStruct(client, w, 1);
+					ViewList::NotifyWalk(w.id, w.x, w.z, w.dir);
+				}
 			}
 			else if (MSGID_FIGHT == mssgid)
 			{
@@ -303,13 +350,27 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 			{
 				Register lg;
 				stream >> lg;
+				if (lg.bAuto)
+				{
+					ZeroMemory(&lg, sizeof(Register));
+					lg.bAuto = true;
+					lg.no = MSGID_REGIST;
+					sprintf_s(lg.name, 15, "%s_%d", "yys", random(200000));
+					sprintf_s(lg.pwd, "pwdyys_%d",random(100000));
+				}
 				int error = ViewList::regist(lg.name, lg.pwd);
-				//if (error != GUGGAME::OK)
+
+				if ((lg.bAuto && error!=GUGGAME::OK) ||
+					 0==lg.bAuto)
 				{
 					ErrorCode ec;
 					ec.msgid = mssgid;
 					ec.errorcode = error;
 					SendStruct(client, ec, 1);
+				}
+				if (lg.bAuto && error==GUGGAME::OK)
+				{
+					SendStruct(client, lg, 1);
 				}
 			}
 			else if (MSGID_ENETRMAP == mssgid)
@@ -326,189 +387,33 @@ void OnAccept(SOCKET client,LEUD::StreamFix &stream)
 					SendStruct(client, ec, 1);
 				}
 			}
-		}
-}
+			else if (MSG_ID_RELIVE == mssgid)
+			{
+				reLive re;
+				stream >> re;
 
-int recvSize(LPPER_IO_DATA perIOData, int recvLen, LEUD::StreamFix &stream)
-{
-	//for (int i = 0; i < recvLen; ++i)
-	//	stream << (char)perIOData->dataBuf.buf[i];
-	memcpy(stream.m_Buffer + stream.m_WritePos, perIOData->dataBuf.buf, recvLen);
-	stream.m_WritePos += recvLen;
-
-	int msgLen = 0;
-	while ((msgLen = BreakMessage(stream)) > 0)
-	{
-		if ((int)stream.size() >= msgLen)
-		{
-			Head head;
-			stream >> head;
-
-			 short  mssgid = (short)BreakMessageID(stream);
-			static int cnt = 0;
-			if (mssgid == 1000)
-			{
-				Pakcage64 pag;
-				stream >> pag;
-				if (1000 != pag.no)
+				int id = ViewList::getID(client);
+				playerData* player = NULL;
+				bool bfind = ViewList::find(id, &player);
+				if (bfind&&player->hp<=0)
 				{
-					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
-				}
-				//printf("recv num %d:%d:%s\n", ++cnt, pag.no, pag.data);
-				SendStruct(perIOData->client,pag, 1);
-			}
-			else if (1001 == mssgid)
-			{
-			
-				//printf("recv num %d\n", ++cnt);
-				test02 t02;
-				char sss[2];
-				sss[0] = 'a';
-				sss[1] = 'b';
-				try
-				{
-					stream >> t02;
-				}
-				catch (...)
-				{
-//				 char* buf =	stream.m_Buffer;
-				}
-			
-				if (1001 != t02.no)
-				{
-					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
-				}
-				SendStruct(perIOData->client,t02, 1);
-			}
-			else if (1002 == mssgid)
-			{
-				//printf("recv num %d\n", ++cnt);
-				test03 t03;
-				stream >> t03;
-				if (1002 != t03.no)
-				{
-					printf("whyyyyyyyyyyyyyyyyyyyyyyyy.");
-				}
-				SendStruct(perIOData->client, t03, 1);
-			}
-			else if (2000 == mssgid)
-			{ 
-				Walk w;
-				stream >> w;
-				//w.sock = (short)perIOData->client;
-				SendStruct(perIOData->client,w,1);
-				ViewList::NotifyWalk(w.id,w.x,w.z,w.dir);
-			}
-			else if (2001 == mssgid)
-			{
-				Fight f;
-				stream >> f;
-				playerData *player = NULL;
-				playerData *target = NULL;
-				masterData *master = NULL;
-				bool bfind = ViewList::find(f.attackerID, &player);
-				int errorcode = GUGGAME::OK;
-				int targetId = 0;
-				if (MapMgr::isPlayer(f.targetID))
-				{
-					bfind = ViewList::find(f.targetID, &target);
-					if (bfind)
-					{
-						targetId = target->id;
-					}
+						ViewList::getCreatureMaxHpMp(0, player->hp, player->mp);
+						player->def = 100;
+						player->x = reliveX;
+						player->z = reliveZ;
+						player->shield = 0;
+						ViewList::NotifyJump(id, player->x, player->z, player->dir);
+						ViewList::NotifyAttrInit(id, player->hp, player->mp, player->def,player->shield);
 				}
 				else
 				{
-					bfind = ViewList::find(f.targetID, &master);
-					if (bfind)
-					{
-						targetId = master->id;
-						if (master->dead > 0)
-						{
-							errorcode = GUGGAME::ERROR_FIGHT_TARGET_DEAD;
-						}
-						else
-						{
-							master->target = player;
-						}
-					}
-				}
-
-					
-				if (player != NULL && targetId>0 &&errorcode==GUGGAME::OK)
-				{
-					ViewList::NotifyFight(f.attackerID, f.targetID, f.action);
-
-					if (f.action == 0) // normal
-					{
-						int num = -random(10);
-						ViewList::attrchg(targetId, HP, num);
-					}
-					else if (f.action == 1) // magic
-					{
-							if (player->mp >= 10)
-							{
-								int num = -random(50);
-								ViewList::attrchg(player->id, MP, -10);
-								ViewList::attrchg(targetId, HP, num);
-							}
-							else
-							{
-								errorcode = GUGGAME::ERROR_NOT_ENOUGH_MP;
-							}
-					}
-				}
-				else
-				{
-					if (errorcode==GUGGAME::OK)
-						errorcode = GUGGAME::ERROR_FIGHT_TARGET_NULL;
-				}
-
-				if (errorcode != GUGGAME::OK)
-				{
 					ErrorCode ec;
 					ec.msgid = mssgid;
-					ec.errorcode = errorcode;
-					SendStruct(perIOData->client, ec, 1);
-				}
-
-			}
-			else if (3000 == mssgid)
-			{
-				Login lg;
-				stream >> lg;
-				int code = ViewList::add(perIOData->client, bornX, bornZ, 0, (char*)lg.name, (char*)lg.pwd);
-				//if( GUGGAME::OK!=code)
-				{
-					ErrorCode ec;
-					ec.msgid = mssgid;
-					ec.errorcode =  code;
-					SendStruct(perIOData->client, ec, 1);
+					ec.errorcode = GUGGAME::ERROR_RELIVE_ERROR;
+					SendStruct(client, ec, 1);
 				}
 			}
-			else if (3001 == mssgid)
-			{
-				Register lg;
-				stream >> lg;
-				int error = ViewList::regist(lg.name, lg.pwd);
-				//if (error != GUGGAME::OK)
-				{
-					ErrorCode ec;
-					ec.msgid = mssgid;
-					ec.errorcode = error;
-					SendStruct(perIOData->client, ec, 1);
-				}
-			}
-		
-			int seekLen = msgLen;
-			clearStream(stream, seekLen);
 		}
-		else
-		{
-			break;
-		}
-	}
-	return 0;
 }
 
 void clearStream(LEUD::StreamFix &stream,size_t seekLen)

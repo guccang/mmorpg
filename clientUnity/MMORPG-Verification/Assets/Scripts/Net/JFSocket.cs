@@ -198,7 +198,11 @@ public class JFSocket  {
 	int getPackageLenght(uint no)
 	{
 		int len = 0;
-		if(no == (uint)JFPackage.MSG_ID.TEST_STRING)
+		if(no == (uint)JFPackage.MSG_ID.LISTKILL)
+		{
+			len = JFTools.size(typeof(JFPackage.PAG_ListKill));
+		}
+		else if(no == (uint)JFPackage.MSG_ID.TEST_STRING)
 		{
 			len =  JFTools.size(typeof(JFPackage.PAG_STRING));
 		}
@@ -254,17 +258,46 @@ public class JFSocket  {
 		{
 			len = JFTools.size(typeof(JFPackage.PAG_EnetrMap));
 		}
+		else if(no == (uint)JFPackage.MSG_ID.RELIVE)
+		{
+			len = JFTools.size((typeof(JFPackage.PAG_RELIVE)));
+		}
+		else if(no == (uint)JFPackage.MSG_ID.REGIST)
+		{
+			len = JFTools.size((typeof(JFPackage.PAG_REGIST)));
+		}
+		else if(no == (uint)JFPackage.MSG_ID.NOTIFY)
+		{
+			len = JFTools.size((typeof(JFPackage.PAG_Notify)));
+		}
 		else
 		{
 			GameDebug.LogError("NO Find MSD in getPackageLenght.");
 		}
-	
 		return len;
 	}
 
 	void getPackage(int header,int Lenght,uint no,byte[] data)
 	{
-		if(no == (uint)JFPackage.MSG_ID.ENTRPMAP)
+		if(no == (uint)JFPackage.MSG_ID.LISTKILL)
+		{
+			JFPackage.PAG_ListKill wp = new JFPackage.PAG_ListKill();
+			wp = (JFPackage.PAG_ListKill)JFTools.BytesToStruct(data,wp.GetType());
+			_curPackages.Add(wp);
+		}
+		else if(no == (uint)JFPackage.MSG_ID.NOTIFY)
+		{
+			JFPackage.PAG_Notify wp = new JFPackage.PAG_Notify();
+			wp = (JFPackage.PAG_Notify)JFTools.BytesToStruct(data,wp.GetType());
+			_curPackages.Add(wp);
+		}
+	  else if(no == (uint)JFPackage.MSG_ID.RELIVE)
+	  {
+					JFPackage.PAG_RELIVE wp = new JFPackage.PAG_RELIVE();
+					wp = (JFPackage.PAG_RELIVE)JFTools.BytesToStruct(data,wp.GetType());
+					_curPackages.Add(wp);
+	  }
+	  else	if(no == (uint)JFPackage.MSG_ID.ENTRPMAP)
 		{
 			JFPackage.PAG_EnetrMap wp = new JFPackage.PAG_EnetrMap();
 			wp = (JFPackage.PAG_EnetrMap)JFTools.BytesToStruct(data,wp.GetType());

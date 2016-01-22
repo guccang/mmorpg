@@ -9,6 +9,7 @@
 #include "viewListTTT.h"
 #include "ioTools.h"
 #include "Event.h"
+#include <mstcpip.h>
 
 using namespace GUGGAME;
 
@@ -248,6 +249,13 @@ DWORD WINAPI serverWorkerThread(LPVOID lpParam)
 				SO_UPDATE_ACCEPT_CONTEXT,
 				(char *)&perIOData->listen,
 				sizeof(perIOData->listen));
+
+			struct tcp_keepalive tcpin;
+			tcpin.onoff = 1;
+			tcpin.keepaliveinterval = 1000;
+			tcpin.keepalivetime = 18000;
+			DWORD dwSize = 0;
+			 err = WSAIoctl(perIOData->client, SIO_KEEPALIVE_VALS, &tcpin, sizeof(tcpin), NULL, 0, &dwSize, NULL, NULL);
 				
 			printf("error setsockopt posted:%d %d\n", WSAGetLastError(),err);
 

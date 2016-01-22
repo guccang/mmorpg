@@ -16,7 +16,9 @@
 
 short bornX = 64;
 short bornZ = 38;
-short AIUpdateTime = 7;
+short reliveX = 43;
+short reliveZ = 27;
+float AIUpdateTime = 20.0f;
 
 using namespace GUGGAME;
 void act_2_utf8(const char* src, size_t src_len, char* des, size_t des_len);
@@ -54,16 +56,7 @@ enum ENUM_CREATURE_ID
 	CREATURE_DYNCMAPOBJ = 5,
 };
 
-enum BLOCK
-{
-	BK_0 = 0,
-	BK_ISLAND = 1,
-	BK_S = 1<<1,
-	BK_T = 1<<2,
-	BK_C = 1<<3,
-	BK_MASTER = 1<<6,
-	BK_PLAYER = 1<<7,
-};
+
 
 
 char* ViewList::mapDataEx = nullptr;
@@ -137,6 +130,11 @@ bool canMove(short x, short z)
 	return false==ViewList::isBlock(x,z);
 }
 
+bool isIslandBlock(short x, short z)
+{
+	return 1==ViewList::isBlock(x, z, BK_ISLAND);
+}
+
 
 BLOCK getBlock(short x, short z)
 {
@@ -188,7 +186,7 @@ bool Move(short x, short z, short x1, short z1)
 }
 
 
-void hatch::init(short id, short x, short z, int radius, int cnt,char *name)
+void hatch::init(short id, short x, short z, short radius, int cnt,char *name)
 {
 	_MapObjectID = id;
 	_x = x;
@@ -203,12 +201,12 @@ float calcFightLen(masterData* master)
 	return ViewList::fightLen + master->fightRadius;
 }
 
-char ViewList::isBlock(short x, short z)
+char ViewList::isBlock(short x, short z,int block)
 {
 	if (checkPos(x, z))
 	{
 		int index = getIndex(x, z);
-		if (mapDataEx[index] & BK_ISLAND || mapDataEx[index] & BK_MASTER)
+		if (mapDataEx[index] & block)
 			return true;
 		else
 			return false;
@@ -224,17 +222,12 @@ void ViewList::PushEvent(TCPClientEvent* e)
 	_tcpClientEventQueue.PushEvent(e);
 }
 void ViewList::masterInit()
-{/*
- 出生：64，37
- 刷怪1：50,23
- 刷怪2：31,23
- BOSS：14,12
- */
-	//hatchArray[0].init(1, 20, 0, 100, 100,"川桑");
-	hatchArray[1].init(CREATURE_MASTER1, 50, 23, 7, 12, "暴暴");
-	hatchArray[2].init(CREATURE_MASTER2, 31, 23, 7, 12, "龙龙");
-	hatchArray[3].init(CREATURE_MASTERBOSS, 14, 12, 3, 1, "亮亮");
-	//hatchArray[4].init(5, -10, -10, 100, 100, "小明");
+{
+	hatchArray[0].init(CREATURE_MASTER1, 56, 26, 7, 8, "嗜血骷髅");
+	hatchArray[1].init(CREATURE_MASTER2, 42, 33, 6, 8, "邪血蝎");
+	hatchArray[2].init(CREATURE_MASTER1, 38, 19, 6, 12, "嗜血骷髅");
+	hatchArray[3].init(CREATURE_MASTER2, 27, 23, 7, 12, "邪血蝎");
+	hatchArray[4].init(CREATURE_MASTERBOSS, 21, 17, 2, 1, "魔王幻影");
 }
 void ViewList::mapInit()
 {
@@ -263,6 +256,7 @@ void ViewList::mapInit()
 		}
 		//printf("\n");
 	}
+	delete data;
 }
 
 void QueueTest()
@@ -305,9 +299,6 @@ void QueueTest()
 		//QueueTest();
 	 }
 
-	
-	
-
 	 int ViewList::regist(const char* name, const char *pwd)
 	 {
 		 if (strlen(name) == 0 || strlen(pwd) == 0)
@@ -322,11 +313,15 @@ void QueueTest()
 			 return GUGGAME::ERROR_HAD_REGIST;
 
 		 bool beGet = get(&db);
+		 if (false == beGet)
+		 {
+			 return GUGGAME::ERROR_REGIST_FULL;
+		 }
+
 		 if (true == beGet)
 		 {
 			 db->flag = 1;
-			 db->hp = 1000;
-			 db->mp = 1000;
+			 getCreatureMaxHpMp(CREATURE_HERO, db->hp, db->mp);
 			 db->def = 10;
 			 db->onLine = 0;
 			 strcpy_s(db->name, name);
@@ -408,38 +403,24 @@ void QueueTest()
 		DeleteObj del;
 		del.id = getID(socke);
 		errorCode = errorCode;
-	/*	if (errorCode == WSAENOTSOCK)
-		{
-		}
-		else if (errorCode == WSAECONNABORTED)
-		{
-		}
-		else
-		{
-			// TODO Fixe
-			printf("why... fixed this please.");
-			return;
-		}
-	*/
 		for (int i = 0; i < 100; ++i)
 		{
 			if (!isOnLine(playerArray[i])) continue;;
 
 			if (playerArray[i].sock == socke)
 			{
-				//printf("Vliew::remove self sock=%d error=%d", socke, errorCode);
-
 				playerArray[i].onLine = 0;
 				playerArray[i].sock = INVALID_SOCKET;
 				playerArray[i].mapid = 0;
 			}
 			else
 			{
-				//printf("Vliew::remove Not Self sock=%d error=%d", socke, errorCode);
-
 				SendStruct((SOCKET)playerArray[i].sock,del,1);
 			}
 		}
+
+		NotifyKillList();
+
 	}
 	  int ViewList::EnterMap(SOCKET sock,short mapid)
 	  {
@@ -453,6 +434,13 @@ void QueueTest()
 		  }
 
 		  db->mapid = mapid;
+		  db->shield = 0;
+		  db->kill = 0;
+		  db->beKill = 0;
+		  if (db->hp <= 0)
+		  {
+			  getCreatureMaxHpMp(CREATURE_HERO, db->hp, db->mp);
+		  }
 
 		  CreateObj c;
 		  c.id = db->id;
@@ -460,7 +448,6 @@ void QueueTest()
 		  c.x = bornX;
 		  c.z = bornZ;
 		  c.dir = 0;
-		  c.hp = db->hp;
 		  strcpy_s(c.name, db->name);
 		  SendStruct((SOCKET)sock, c, 1);
 
@@ -469,6 +456,8 @@ void QueueTest()
 		  att.mp = db->mp;
 		  att.def = db->def;
 		  att.id = db->id;
+		  att.maxShiled = 3000;
+		  att.shiled = db->shield;
 		  SendStruct((SOCKET)sock, att, 1);
 
 		  NotifyMapInfo(db->id);
@@ -558,8 +547,10 @@ void QueueTest()
 		  for (int i = 0; i < 500; ++i)
 		  {
 			  if (masterArray[i].flag == 0 || masterArray[i].dead>0) continue;
+			  if (masterArray[i].target !=NULL) continue;
+
 			  int theLen = len(master, &masterArray[i]);
-			  if (theLen>0 && tmp > theLen && theLen <= calcFightLen(master))
+			  if (theLen>0 && tmp > theLen )
 			  {
 				  tmp = theLen;
 				  *freeData = &masterArray[i];
@@ -577,6 +568,8 @@ void QueueTest()
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  if (!isOnLine(playerArray[i])) continue;
+			  if (playerArray[i].hp <=0) continue;
+
 			  int theLen = len(master, &playerArray[i]);
 			  if (theLen>0&&tmp > theLen && theLen<=master->radius)
 			  {
@@ -641,8 +634,8 @@ void QueueTest()
 				c.x = x;
 				c.z = z;
 				c.dir = dir;
-				c.hp = p->hp;
 				strcpy_s(c.name, p->name);
+				printf("%s %s: %d %d\n",c.name,p->name,strlen(c.name),strlen(p->name));
 				SendStruct((SOCKET)playerArray[i].sock, c, 1);
 			}
 		}
@@ -658,7 +651,7 @@ void QueueTest()
 			cc.x = playerArray[i].x;
 			cc.z = playerArray[i].z;
 			cc.dir = playerArray[i].dir;
-			cc.hp = playerArray[i].hp;
+			printf("%s %s: %d %d\n", cc.name, playerArray[i].name, strlen(cc.name), strlen(playerArray[i].name));
 			strcpy_s(cc.name, playerArray[i].name);
 			SendStruct((SOCKET)p->sock, cc, 1);
 		}
@@ -673,15 +666,29 @@ void QueueTest()
 			cc.x = masterArray[i].x;
 			cc.z = masterArray[i].z;
 			cc.dir = masterArray[i].dir;
-			cc.hp = masterArray[i].hp;
 			strcpy_s(cc.name, masterArray[i].name);
 			SendStruct((SOCKET)p->sock, cc, 1);
 		}
 
-		NotifyAttrInit(p->id, p->hp, p->mp, p->def);
+		NotifyAttrInit(p->id, p->hp, p->mp, p->def,p->shield);
 
+
+		NotifyKillList();
 	}
-
+	bool ViewList::isDead(int id)
+	{
+		CriticalSection::Lock lock(m_lock);
+		playerData *p = NULL;
+		bool bfind = false;
+		bfind = find(id, &p);
+		if (false == bfind) return true;
+		if (bfind)
+		{
+			if (p->hp <= 0) return true;
+			else return false;
+		}
+		return true;
+	}
 	  void ViewList::NotifyWalk(int id,short x,short y,char dir)
 	  {
 		  CriticalSection::Lock lock(m_lock);
@@ -723,7 +730,6 @@ void QueueTest()
 			  {
 				  if (len(master, &playerArray[i])>viewLen*viewLen)
 				 	  continue;
-
 				  Walk w;
 				  w.id = id;
 				  w.x = master->x;
@@ -734,7 +740,7 @@ void QueueTest()
 		  }
 	  }
 
-	  void ViewList::NotifyFight(int attack,int target, short action)
+	  void ViewList::NotifyFight(int attack,int target, short action,int order,short p0,short p1)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  for (int i = 0; i < 100; ++i)
@@ -745,6 +751,9 @@ void QueueTest()
 				  f.attackerID = attack;
 				  f.targetID = target;
 				  f.action = action;
+				  f.parm01 = p0;
+				  f.parm02 = p1;
+				  f.order = order;
 				  SendStruct((SOCKET)playerArray[i].sock, f, 1);
 			  }
 		  }
@@ -772,7 +781,6 @@ void QueueTest()
 				 c.x = player->dyncBlock[j].x;
 				 c.z = player->dyncBlock[j].z; 
 				 c.dir = player->dyncBlock[j].dir;
-				 c.hp = 100000;
 				 SendStruct(playerArray[i].sock, c, 1);
 			 }
 		  }
@@ -838,7 +846,7 @@ void QueueTest()
 			  printf("send block info:%d",cnt);
 	  }
 
-	  void ViewList::NotifyAttrChg(int id ,int  type, int num,short delay)
+	  void ViewList::NotifyAttrChg(int attackId , int targetId,short action,int  type, int num,short delay,int order)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  //if (MapMgr::isPlayer(id))
@@ -849,10 +857,13 @@ void QueueTest()
 
 				  // notify hp chang
 				  AttrChg att;
-				  att.id = id;
+				  att.attackID = attackId;
+				  att.targetID = targetId;
+				  att.action = action;
 				  att.type = (short)type;
 				  att.num = (short)num;
 				  att.delay = delay;
+				  att.order = order;
 				  SendStruct(playerArray[i].sock, att, 1);
 			  }
 		  }
@@ -862,7 +873,7 @@ void QueueTest()
 		  }
 	  }
 
-	  void ViewList::NotifyMasterAttrInit(int id)
+	  void ViewList::NotifyMasterAttrInit(int id,int type)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  masterData* master = NULL;
@@ -878,22 +889,31 @@ void QueueTest()
 			  att.hp = master->hp;
 			  att.mp = master->mp;
 			  att.def = master->def;
+			  att.maxShiled = 0;
+			  att.shiled = 0;
+			  getCreatureMaxHpMp(type, att.maxhp, att.maxmp);
 			  SendStruct(playerArray[i].sock, att, 1);
 		  }
 	  }
 
-	  void ViewList::NotifyAttrInit(int id,int hp,int mp,int def)
+	  void ViewList::NotifyAttrInit(int id,int hp,int mp,int def,int shiled)
 	  {
 		  CriticalSection::Lock lock(m_lock);
+		  int maxHp = 0, maxMp = 0;
+		  int type = CREATURE_HERO;
 		  for (int i = 0; i < 100; ++i)
 		  {
 			  if (!needSend(&playerArray[i])) continue;
-
+			  getCreatureMaxHpMp(type, maxHp, maxMp);
 			  // notify self hp chang
 			  Attr att;
 			  att.id = id;
+			  att.maxhp = maxHp;
+			  att.maxmp = maxMp;
+			  att.maxShiled = 3000;
 			  att.hp = hp;
 			  att.mp = mp;
+			  att.shiled = shiled;
 			  att.def = def;
 			  SendStruct((SOCKET)playerArray[i].sock, att, 1);
 		  }
@@ -904,24 +924,35 @@ void QueueTest()
 			  if (!needSend(&playerArray[i])) continue;
 			  if (playerArray[i].id == id) continue;
 
+			  type = CREATURE_OTHERPLAYER;
+			  getCreatureMaxHpMp(type, maxHp, maxMp);
 			  Attr att;
 			  att.id = playerArray[i].id;
+			  att.maxhp = maxHp;
+			  att.maxmp = maxMp;
+			  att.maxShiled = 3000;
 			  att.hp = playerArray[i].hp;
 			  att.mp = playerArray[i].mp;
 			  att.def = playerArray[i].def;
+			  att.shiled = playerArray[i].shield;
 			  SendStruct((SOCKET)getSock(id), att, 1);
 		  }
 
 		  for (int i = 0; i < 500; ++i)
 		  {
 			  if (masterArray[i].flag == 0) continue;
-
+			  type = masterArray[i].masterType;
+			  getCreatureMaxHpMp(type, maxHp, maxMp);
 			  // master attr init
 			  Attr att;
 			  att.id = masterArray[i].id;
+			  att.maxhp = maxHp;
+			  att.maxmp = maxMp;
 			  att.hp = masterArray[i].hp;
 			  att.mp = masterArray[i].mp;
 			  att.def = masterArray[i].def;
+			  att.maxShiled = 3000;
+			  att.shiled = 0;
 			  SendStruct((SOCKET)getSock(id), att, 1);
 		  }
 	  }
@@ -942,7 +973,7 @@ void QueueTest()
 		  }
 	  }
 
-	  void ViewList::areoDamage(short x, short z, char radius, int demage,int attackID,short action)
+	  void ViewList::areoDamage(short x, short z, char radius, int demage,int attackID,short action,int order)
 	  {
 		  CriticalSection::Lock lock(m_lock);
 		  int dis = (int)radius;
@@ -961,8 +992,7 @@ void QueueTest()
 			  {
 				  num++;
 				  masterArray[i].target = player;
-				  NotifyFight(attackID, masterArray[i].id, action);
-				  attrchg(masterArray[i].id, HP, demage);
+				  attrchg(attackID,masterArray[i].id,action, HP, demage,0,order);
 			  }
 		  }
 		  printf("Area Demage master num:%d\n",num);
@@ -970,11 +1000,11 @@ void QueueTest()
 		  {
 			  if (!needSend(&playerArray[i])) continue;
 			  if (attackID == playerArray[i].id) continue;
+			  if (isDead(playerArray[i].id)) continue;
 
 			  if (distance(x, z, playerArray[i].x, playerArray[i].z) <= dis)
 			  {
-				  NotifyFight(attackID, playerArray[i].id, action);
-				  attrchg(playerArray[i].id, HP, demage);
+				  attrchg(attackID,playerArray[i].id,action, HP, demage,0,order);
 			  }
 		  }
 	  }
@@ -1035,14 +1065,80 @@ void QueueTest()
 		  NotifyDyncMapObj(player->id);
 	  }
 
-	  void ViewList::attrchg(int id, int type, int num,short delay)
+	  void ViewList::NotifyMessage(const char* attack,const char* target)
+	  {
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (!needSend(&playerArray[i])) continue;
+
+			  // notify hp chang
+			  Notify no;
+			  no.type = 1;
+			  sprintf_s(no.attack,"%s", attack);
+			  sprintf_s(no.target,"%s", target);
+			  SendStruct(playerArray[i].sock, no, 1);
+		  }
+	  }
+	  bool canAddKillLists(ListOfKills list,int killed,int &id)
+	  {
+		  if (list.size < 10)return true;
+
+		  for (unsigned int i = 0; i < list.size; ++i)
+		  {
+			  if (list.data[i].killed < killed)
+			  {
+				  id = list.data[i].id;
+				  return true;
+			  }
+		  }
+		  return false;
+	  }
+	  void ViewList::NotifyKillList(int id)
+	  {
+		  ListOfKills s;
+		  int idIndex = 0;
+		  for (int i = 0; i < 100; ++i)
+		  {
+			  if (!needSend(&playerArray[i])) continue;
+			  if (id != 0 && playerArray[i].id!=id) continue;
+   			  bool canAdd = canAddKillLists(s, playerArray[i].kill, idIndex);
+			  if (canAdd)
+			  {
+				  int index = 0;
+				  if (s.size < 9)
+				  {
+					  index = s.size;
+					  s.size++;
+				  }
+				  else
+				  {
+					  index = idIndex;
+				  }
+				  s.data[index].beKilled = playerArray[i].beKill;
+				  s.data[index].killed = playerArray[i].kill;
+				  s.data[index].id = playerArray[i].id;
+				  printf("kill list add name : %s",playerArray[i].name);
+				  strcpy_s(s.data[index].name, playerArray[i].name);
+			  }
+		  }
+
+		  if (s.size<=0) return;
+
+		  for (int i = 0; i < 100;++i)
+		  {
+			  if (!needSend(&playerArray[i])) continue;
+			  SendStruct(playerArray[i].sock, s, 1);
+		  }
+	  }
+
+	  void ViewList::attrchg(int attackId,int targetId,short action, int type, int num,short delay,int order)
 	  {
 		  CriticalSection::Lock lock(m_lock);
-		  bool isPlayer = MapMgr::isPlayer(id);
+		  bool isPlayer = MapMgr::isPlayer(targetId);
 		  if (isPlayer)
 		  {
 			  playerData *player = NULL;
-			  bool bfind = find(id, &player);
+			  bool bfind = find(targetId, &player);
 			  if (false == bfind) return;
 
 			  if (type == HP)
@@ -1051,54 +1147,83 @@ void QueueTest()
 				  {
 					  player->shield += num;
 					  if (player->shield < 0) player->shield = 0;
-					  NotifyAttrChg(id, SHIELD, player->shield,delay);
+					  NotifyAttrChg(attackId,targetId,action, SHIELD, player->shield,delay,order);
 				  }
 				  else
 				  {
 					  player->hp += num;
 					  if (player->hp < 0) player->hp = 0;
-					  NotifyAttrChg(id, HP, num,delay);
+					  NotifyAttrChg(attackId,targetId,action, HP, num,delay,order);
+					  if (player->hp <= 0)
+					  {
+						  if (MapMgr::isPlayer(attackId))
+						  {
+							  playerData* attack = NULL;
+							  bfind = find(attackId, &attack);
+							  if (bfind)
+							  {
+								  Notify no;
+								  no.type = 0;
+								  attack->kill++;
+								  player->beKill++;
+								  sprintf_s(no.attack,"%s", attack->name);
+								  sprintf_s(no.target, "%s", player->name);
+								  SendStruct(player->sock, no, 1);
+								  NotifyKillList();
+							  }
+						  }
+					  }
 				  }
 			 }
 			  if (type == MP)
 			  {
-				  player->mp += num;
-				  if (player->mp < 0) player->mp = 0;
-				  NotifyAttrChg(id, MP, num,delay);
+				  //player->mp += num;
+				  //if (player->mp < 0) player->mp = 0;
+				  //NotifyAttrChg(attackId,targetId,action, MP, num,delay,order);
 			  }
 
 			  if (type == SHIELD)
 			  {
-				  NotifyAttrChg(id, SHIELD, player->shield,delay);
+				  NotifyAttrChg(attackId,targetId,action, SHIELD, player->shield,delay,order);
 			  }
 
 			  if (player->hp <= 0)
 			  {
-				  player->hp = 150000;
+			/*	  player->hp = 150000;
 				  player->mp = 150000;
 				  player->def = 100;
 				  clearMoveFlag(player->x, player->z);
 				  player->x = bornX;
 				  player->z = bornZ;
-				  NotifyJump(id, player->x,player->z, player->dir);
-				  NotifyAttrInit(id, player->hp, player->mp, player->def);
+				  NotifyJump(targetId, player->x,player->z, player->dir);
+				  NotifyAttrInit(targetId, player->hp, player->mp, player->def);
+				  */
 			  }
 		  }
 		  else // master
 		  {
 			  masterData *master = NULL;
-			  bool bfind = find(id, &master);
+			  bool bfind = find(targetId, &master);
 			  if (false == bfind) return;
 
 			  if (type == HP)
 			  {
 				  master->hp += num;
-				  NotifyAttrChg(id, HP, num,delay);
+				  NotifyAttrChg(attackId,targetId,action, HP, num,delay,order);
+				  if (master->hp<=0&&MapMgr::isPlayer(attackId)&&master->masterType == CREATURE_MASTERBOSS)
+				  {
+					  playerData* attack = NULL;
+					  bfind = find(attackId, &attack);
+					  if (bfind)
+					  {
+						  NotifyMessage(attack->name,master->name);
+					  }
+				  }
 			  }
 			  if (type == MP)
 			  {
 				  master->mp += num;
-				  NotifyAttrChg(id, MP, num,delay);
+				  NotifyAttrChg(attackId,targetId,action, MP, num,delay,order);
 			  }
 
 			  if (master->hp <= 0)
@@ -1112,31 +1237,63 @@ void QueueTest()
 		  }
 	  }
 
+	  void ViewList::getCreatureMaxHpMp(int type,int &hp,int &mp)
+	  {
+		  if (CREATURE_HERO == type || CREATURE_OTHERPLAYER == type)
+		  {
+			  hp = 5613;
+			  mp = 820;
+			 
+		  }
+		  else if (CREATURE_MASTER1 == type)
+		  {
+			  hp = 2807;
+			  mp = 0;
+		  }
+		  else if (CREATURE_MASTER2 == type)
+		  {
+			  hp = 1123;
+			  mp = 0;
+		  }
+		  else if (CREATURE_MASTERBOSS == type)
+		  {
+			  hp = 120000;
+			  mp = 0;
+		  }
+	  }
+
 	  void InitMaster(masterData* master,int spawnId,hatch* sp)
 	  {
-		  int radius = sp->_radius;
+		  short radius = sp->_radius;
 		  master->masterType = sp->_MapObjectID;
 		  master->spawnid = spawnId;
 		  if (master->dead==0)
-			 master->id = MapMgr::generateID(1);
+			 master->id = MapMgr::generateID(ENUM_MAPOBJ_MASTER);
 		  master->radius = radius;
-		  master->hp = 500*master->masterType;
-		  master->mp = 100;
+		  ViewList::getCreatureMaxHpMp(master->masterType,master->hp,master->mp);
+		 // master->hp = 500*master->masterType;
+		 // master->mp = 100;
 		  master->def = 10; 
 		  master->dir = 0;
 		  master->dead = 0;
-		  master->x = sp->_x + (short)random(radius);
-		  master->z = sp->_z + (short)random(radius);
+		  master->x = sp->_x + (short)randomDW(radius);
+		  master->z = sp->_z + (short)randomDW(radius);
 		  master->bx = master->x;
 		  master->bz = master->z;
-		  act_2_utf8(sp->_name, 5, master->name, 16);
+		  act_2_utf8(sp->_name, strlen(sp->_name)+1, master->name, 16);
 		  master->flag = 1;
 		  master->state = 0;
 		  master->target = NULL;
 		  master->blockcnt = 0;
 		  master->astart = 0;
 		  master->pathNum = 0;
-		  master->fightRadius = 0;// (short)(master->masterType*0.5f);
+		  master->fightRadius = 0;
+		  if (master->masterType == CREATURE_MASTERBOSS)
+			 master->fightRadius = 1;// (short)(master->masterType*0.5f);
+		  master->fightTime = 1500;
+		  master->walkTime = 1500;
+		  master->tx = master->x;
+		  master->tz = master->z;
 	  }
 
 	  bool ViewList::get(masterData** freeData)
@@ -1151,30 +1308,24 @@ void QueueTest()
 		  }
 		  return false;
 	  }
-	  void resetMaster(masterData* master)
+	  void resetMaster(masterData* master,int state)
 	  {
 		  master->blockcnt = 0;
 		  master->astart = 0;
 		  master->pathNum = 0;
-		 // master->target = NULL;
+		  master->state = state;
+		  //master->target = NULL;
 	  }
-	  void walkToTarget(masterData* master)
+
+	  bool walkToPos(masterData* master)
 	  {
-		  if (master->target == NULL || !needSend((master->target)))
+		  if (distance3D(master->x, master->z, master->tx, master->tz) <= 1)
 		  {
-			  master->target = NULL;
-			  master->state = 0;
-			  return;
+			  resetMaster(master,0);
+			  return true;
 		  }
 
-		  int theLne = len(master, master->target);
-		  if (theLne<=calcFightLen(master))
-		  {
-			  resetMaster(master);
-			  master->state = 2;
-			  return;
-		  }
-		  if (master->pathNum>master->astart)
+		  if (master->pathNum > master->astart)
 		  {
 			  int index = master->astart;
 			  short sx = master->path[index].x;
@@ -1182,84 +1333,53 @@ void QueueTest()
 			  if (abs(master->x - sx) > 5 ||
 				  abs(master->z - sz) > 5)
 			  {
-				  printf("some error on path find...");
+				  printf("some error on path find...\n");
 			  }
 			  if (Move(master->x, master->z, sx, sz))
-				  {
-					  master->x = sx;
-					  master->z = sz;
-					  master->astart++;
-					  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
-				  }
-			 else
-				  {
-					  if (master->blockcnt++>5)
-					  {
-						  resetMaster(master);
-						  master->state = 0;
-						  //printf("astart failed\n");
-					  }
-				  }
-			  return;
-			  }
-
-	
-		  int x = master->target->x - master->x;
-		  int z = master->target->z - master->z;
-
-		  short posX = master->x, posZ = master->z;
-		  char dir = -1;
-		  short detaX = 0, detaZ = 0;
-		  if (x >= ViewList::fightLen)
-		  {
-			  detaX = 1;
-			  dir  = 0;
-		  }
-		  else if (x <= -ViewList::fightLen)
-		  {
-			  detaX = -1;
-			  dir = 1;
-		  }
-		  if (z >= ViewList::fightLen)
-		  {
-			  detaZ = 1;
-			  dir = 2;
-		  }
-		  else if (z <= -ViewList::fightLen)
-		  {
-			  detaZ = -1;
-			  dir = 3;
-		  }
-
-		  if (dir < 0)
-		  {
-			  printf("not important walkToTarget。");
-			  master->state = 0;
-		  }
-		  // 或许永远到达不了。因为没有真正的路径算法。隔堵墙就sb了哈哈哈。
-		  // 简单的解决走不了问题。
-		  // master沿着player朝向一直移动，乳沟阻碍了，就绕过去。绕5次还不行就，进入初始状态了。
-		  //
-		  posX = master->x + detaX;
-		  posZ = master->z + detaZ;
-		
-		  if (Move(master->x,master->z,posX,posZ))
-		  {
-			  if (abs(master->x - posX) > 5 ||
-				  abs(master->z - posZ) > 5)
 			  {
-				  printf("some error on path find...");
+				  master->x = sx;
+				  master->z = sz;
+				  master->astart++;
+				  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
 			  }
-			  master->x = posX;
-			  master->z = posZ;
-			  master->dir = dir;
+			  else
+			  {
+				  if (master->blockcnt++ > 20)
+				  {
+					  resetMaster(master,0);
+					  //printf("astart failed\n");
+				  }
+			  }
+			  return false;
+		  }
+
+		  // vector 
+		  short tx = master->tx;
+		  short tz = master->tz;
+
+		  short x = tx - master->x;
+		  short z = tz - master->z;
+
+		  if (x > 0)	x = 1;
+		  if (x < 0)	x = -1;
+		  if (z > 0)	z = 1;
+		  if (z < 0)	z = -1;
+
+		  short mx = master->x + x;
+		  short mz = master->z + z;
+
+		  if (Move(master->x, master->z, mx, mz))
+		  {
+			  master->x = mx;
+			  master->z = mz;
 			  ViewList::NotifyWalk(master->id, master->x, master->z, master->dir);
 		  }
 		  else
 		  {
+			  // AStar
 			  pathNode path[50];
 			  ZeroMemory(path, sizeof(int) * 50);
-			  int pathNum =  findPath((master->x), (master->z), (master->target->x), (master->target->z), path);
+			  int pathNum = findPath((master->x), (master->z), tx,tz, path);
 			  if (pathNum < 10)
 			  {
 				  master->astart = 0;
@@ -1272,12 +1392,47 @@ void QueueTest()
 			  }
 			  else
 			  {
-				  resetMaster(master);
-				  master->state = 0;
+				  resetMaster(master,0);
 			  }
 		  }
-		 
-		
+
+
+		  return false;
+	  }
+
+	  void walkToTarget(masterData* master)
+	  {
+		  if (master->target == NULL || !needSend((master->target)))
+		  {
+			  master->target = NULL;
+			  master->state = 0;
+			  return;
+		  }
+
+		  int theLne = len(master, master->target);
+		  if (theLne<=calcFightLen(master))
+		  {
+			  resetMaster(master,2);
+			  return;
+		  }
+	
+		  master->tx = master->target->x;
+		  master->tz = master->target->z;
+		  walkToPos(master);
+	  }
+
+	  void findMasterSetTarget(masterData* p, int cnt=3)
+	  {
+		  for (int i = 0; i < cnt; ++i)
+		  {
+			  masterData* m = NULL;
+			  bool bfind = ViewList::getNearestMaster(p, &m);
+			  if (bfind)
+			  {
+				  m->target = p->target;
+				  resetMaster(m, 2);
+			  }
+		  }
 	  }
 
 	  void AI(masterData* master)
@@ -1290,58 +1445,36 @@ void QueueTest()
 		  {
 			  randNum = random(5);
 			  if (randNum == 0)
-				  master->state = 0;
-			  else if (randNum == 2)
-				  master->state = 2;
-			  else master->state = 1;
+				  resetMaster(master, 1);
+			  //else if (randNum == 2)
+			  //	  master->state = 2;
+			  else resetMaster(master, 0);
+
+			  if (master->target != NULL)
+				  resetMaster(master, 2);
+
 		  }break;
 		  case 1: // walk
 		  {
-			  randNum = random(5);
-			  short x = master->x, z=master->z;
-			  short bx = master->bx, bz = master->bz;
-			  int dis = distance(x, z, bx, bz);
-			  short detax=0, detaz=0;
-			  if (dis > master->radius)
+			  if (walkToPos(master))
 			  {
-				  detax = (bx - x)>0?1:-1;
-				  detaz = (bz - z)>0?1:-1;
-			  }
-			  else
-			  {
-				 // detax = (x - bx)>0?1:-1;
-				 // detaz = (z - bz)>0?1:-1;
-				  if (0 == randNum)
-					  detax =  1;
-				  else if (1 == randNum)
-					  detax =  -1;
-				  else if (2 == randNum)
-					   detaz =  -1;
-				  else if (3 == randNum)
-					  detaz =  1;
-			  }
-			  x = master->x + detax;
-			  z = master->z + detaz;
-			  /*
-			
-			  */
-			  if (4==randNum) master->state = 2;
-			  
-
-			  if (randNum<4)
-			  {
-				  if (Move(master->x, master->z, x, z)) // map data check
+				  short rx = randomDW(master->radius) + master->bx;
+				  short rz = randomDW(master->radius) + master->bz;
+				  while (isIslandBlock(rx, rz))
 				  {
-					  if (abs(master->x - x) > 5 ||
-						  abs(master->z - z) > 5)
-					  {
-						  printf("some error on path find...");
-					  }
-					  master->x = x;
-					  master->z = z;
-					  ViewList::NotifyWalk(master->id, master->x, master->z, randNum);
+					   rx = randomDW(master->radius) + master->bx;
+					   rz = randomDW(master->radius) + master->bz;
 				  }
+				  master->tx = rx;
+				  master->tz = rz;
 			  }
+
+			  randNum = random(5);
+			  if (randNum == 4)
+				  resetMaster(master, 0);
+			  if (master->target != NULL)
+				  resetMaster(master, 2);
+			  
 		  }break;
 		  case 2: // fight
 		  {
@@ -1354,34 +1487,78 @@ void QueueTest()
 				  if (getFinght)
 				  {
 					  master->target = target;
+					
 					  //ViewList::NotifyFight(master->id, target->id, 0);
 					  //ViewList::attrchg(target->id, HP, -random(10));
 				  }
 				  else
 				  {
-					  master->state = 0;
+					  resetMaster(master, 0);
 				  }
 			  }
 			  else
 			  {
-				  if (!needSend((master->target)))
+				  if (!needSend((master->target)) || master->target->hp<=0)
 				  {
 					  master->target = NULL;
-					  master->state = 1; // walk
+					  resetMaster(master, 1);
 				  }
 				  else
 				  {
 					  int tmp = len(master, master->target);
-					  if (tmp > 0)
+					 // if (tmp >= 0)
 					  {
-						  if (tmp <=calcFightLen(master))
+						  if (tmp <=calcFightLen(master) && master->fightTime<=0)
 						  {
-							  ViewList::NotifyFight(master->id, master->target->id, 0);
-							  ViewList::attrchg(master->target->id, HP, -random(10));
+							  master->fightTime = 1500;
+							  ViewList::NotifyFight(master->id, master->target->id, HEHE_MASTER_ATT,0);
+							  int demage = 0;
+							  if (master->masterType == CREATURE_MASTER1)
+							  {
+								  demage = ViewList::calcDeamge(120, 160);
+							  }
+							  else if (CREATURE_MASTER2 == master->masterType)
+							  {
+								  demage = ViewList::calcDeamge(250, 421);
+							  }
+							  else if (CREATURE_MASTERBOSS == master->masterType)
+							  {
+								  // boss ai
+								  int randomNum = 8;
+								  if (master->hp < 60000)
+								  {
+									  randomNum = 5;
+								  }
+								  else if (master->hp < 30000)
+								  {
+									  randomNum = 3;
+								  }
+								  else if (master->hp < 10000)
+								  {
+									  randomNum = 2;
+								  }
+
+								  int rNum = random(randomNum);
+								  if (rNum == 0)
+								  {
+									  findMasterSetTarget(master,3);
+									  ViewList::NotifyFight(master->id, -1, SKILL_BOSS_Call, 0);
+								  }
+								  else
+								  {
+									  demage = ViewList::calcDeamge(170, 1200);
+								  }
+							  }
+							  else
+							  {
+								  printf("calcDemage why.... not find master type %d",master->masterType);
+							  }
+							  ViewList::attrchg(master->id,master->target->id,HEHE_MASTER_ATT, HP,demage);
+							  
 						  }
 						  else
 						  {
-							  master->state = 3;
+							  resetMaster(master, 3);
 						  }
 
 					  }
@@ -1393,15 +1570,13 @@ void QueueTest()
 			  if (master->target == NULL)
 			  {
 				  printf("why master-target is null");
-				  master->state = 0; // stand
-				  resetMaster(master);
+				  resetMaster(master,0);
 				  master->target = NULL;
 				  break;
 			  }
-			  if (!needSend((master->target)))
+			  if (!needSend((master->target)) || master->target->hp<=0)
 			  {
-				  master->state = 0; // stand
-				  resetMaster(master);
+				  resetMaster(master,0);
 				  master->target = NULL;
 				  break;
 			  }
@@ -1427,6 +1602,25 @@ void QueueTest()
 		  }
 	  }
 
+	  int ViewList::calcDeamge(int minNum, int maxNum,ENUM_SKILL_TYPE skillid)
+	  {
+		  
+		  int damage = -(random((maxNum- minNum)) + minNum);
+		  
+		  if (skillid == SKILL_TRAIL)
+		  {
+			  damage =  (int)(damage * 1.5f);
+		  }
+		  else if (skillid == SKILL_AREA_SELF)
+		  {
+			  damage = (int)(damage * 1.3f);
+		  }
+		  else if (skillid == SKILL_AREA_ISLAND)
+		  {
+			  damage = (int)(damage * 1.2f);
+		  }
+		  return damage;
+	  }
 	  
 	  bool ViewList::check(SOCKET socket)
 	  {
@@ -1448,6 +1642,7 @@ void QueueTest()
 
 			  SendStruct(playerArray[i].sock, del, 1);
 		  }
+
 	  }
 
 	  void ViewList::Update(float t)
@@ -1475,8 +1670,11 @@ void QueueTest()
 		  }
 		  static float theTime = 0;
 		  float els = t - theTime;
+		  static int cntELS = 0;
 		  if (els< AIUpdateTime)
 		  {
+			  if (cntELS++ % 5000 == 0)
+				printf("some error not find %f %f %f\n",t,theTime,els);
 		  }
 		  else
 		  {
@@ -1488,20 +1686,51 @@ void QueueTest()
 				  if (masterArray[i].flag != 1) continue;
 				  if (masterArray[i].dead > 0)
 				  {
-					  if (masterArray[i].dead++<masterArray[i].masterType*10)
+					  if (masterArray[i].dead++<masterArray[i].masterType*8)
 						  continue;
 					  int spawnid = masterArray[i].spawnid;
 					  InitMaster(&masterArray[i], spawnid ,&hatchArray[spawnid]);
-					  masterArray[i].hp = 700*masterArray[i].masterType;
-					  masterArray[i].mp = 300;
+					  getCreatureMaxHpMp(masterArray[i].masterType, masterArray[i].hp, masterArray[i].mp);
 					  masterArray[i].def = 90;
 					  masterArray[i].dead = 0;
-					  NotifyMasterAttrInit(masterArray[i].id);
+					  NotifyMasterAttrInit(masterArray[i].id,(int)masterArray[i].masterType);
 					  NotifyJump(masterArray[i].id, masterArray[i].x, masterArray[i].z, 0);
 				  }
 				  else
 				  {
 					  masterData *master = &masterArray[i];
+					  if (master->fightTime > 0)
+					  {
+						  master->fightTime -= (int)els*20;
+						  if (master->fightTime < 0) master->fightTime = 0;
+					  }
+					  if (master->walkTime > 0)
+					  {
+						  master->walkTime -= (int)els * 20;
+						  if (master->walkTime < 0) master->walkTime = 0;
+					  }
+
+					  // Hp Up
+					  int maxHp = 0;
+					  int maxMp = 0;
+					  getCreatureMaxHpMp(master->masterType, maxHp, maxMp);
+					  if (master->target == NULL)
+					  {
+						  if (master->hp < maxHp)
+						  {
+							  int re = 100;
+							  if (master->masterType == CREATURE_MASTERBOSS)
+								  re = 1000;
+
+							  if (master->hp + re > maxHp)
+							  {
+								  re = maxHp - master->hp;
+							  }
+							 // master->hp += re;
+							 // NotifyAttrChg(master->id, master->id, SKILL_HP_AUTO_ADD, HP, re);
+
+						  }
+					  }
 					  // AI Fight Moving
 					  // find the player
 					  // fight the palyer

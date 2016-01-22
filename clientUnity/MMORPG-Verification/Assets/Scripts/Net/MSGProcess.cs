@@ -22,7 +22,32 @@ public class MSGProcess {
 			{
 				JFPackage.IPackage pag = pages[i];
 				NetMgr.getSingleton().perfact(pag.ID);
-				if(pag.ID == (uint)JFPackage.MSG_ID.MAPINFO)
+				if(pag.ID == (uint)JFPackage.MSG_ID.LISTKILL)
+				{
+					JFPackage.PAG_ListKill kill = (JFPackage.PAG_ListKill)pag;
+					GameDebug.Log("recv list of killed:"+kill._cnt);
+					List<JFPackage.killBeKilledData> listStruct = new List<JFPackage.killBeKilledData>();
+					JFTools.bytesToArrayStruct(kill._inner,kill._cnt,listStruct);
+					foreach(var v in listStruct)
+					{
+						GameDebug.Log("Array Info: "+
+						              " id:"+v._id+
+						              " beKilled:"+v._beKilled+
+						              " killed:"+v._killed+
+									  " name:"+StringEncoding.GetString(v._name));
+					}
+				}
+				else if(pag.ID == (uint)JFPackage.MSG_ID.NOTIFY)
+				{
+					JFPackage.PAG_Notify no = (JFPackage.PAG_Notify)pag;
+					GameDebug.Log("NotifyMessage:"+StringEncoding.GetString(no._attack) + "杀死了" + StringEncoding.GetString(no._target));
+				}
+				else if(pag.ID == (uint)JFPackage.MSG_ID.REGIST)
+				{
+					JFPackage.PAG_REGIST reg = (JFPackage.PAG_REGIST)pag;
+					GameDebug.Log(StringEncoding.GetString(reg._name)+":"+StringEncoding.GetString(reg._pwd));
+				}
+				else if(pag.ID == (uint)JFPackage.MSG_ID.MAPINFO)
 				{
 					JFPackage.PAG_MAPINF mapInof = (JFPackage.PAG_MAPINF)pag;
 					Hero.NotifyMapInfo(mapInof._x,mapInof._z,mapInof._block);
@@ -35,21 +60,26 @@ public class MSGProcess {
 				else if(pag.ID == (uint)JFPackage.MSG_ID.ATTR)
 				{
 					JFPackage.PAG_ATTR attr = (JFPackage.PAG_ATTR)pag;
-					if(Hero!=null)Hero.AttrInit(attr._id.ToString(),attr._hp,attr._mp,attr._def);
+					if(Hero!=null)Hero.AttrInit(attr._id.ToString(),attr._maxHp,attr._maxMp,attr._hp,attr._mp,attr._def,attr._maxShiled,attr._shiled);
 					else
 						GameDebug.LogError("hero is null");
 				}
 				else if(pag.ID == (uint)JFPackage.MSG_ID.ATTRCHG)
 				{
 					JFPackage.PAG_ATTRCHG attr = (JFPackage.PAG_ATTRCHG)pag;
+					int action = attr._action;
+					if(Hero.ID != attr._targetID)
+						Hero.NotifyFight(attr._attackID,attr._targetID,attr._action);
+
 					if(attr._delay<=0)
 					{
-						Hero.NotifyAttrChg(attr._id.ToString(),attr._type,attr._num);
+						Hero.NotifyAttrChg(attr._targetID.ToString(),attr._type,attr._num);
 					}
 					else
 					{
-						Hero.NotifyAttrChgDelay(attr._id.ToString(),attr._type,attr._num,attr._delay);
+						Hero.NotifyAttrChgDelay(attr._targetID.ToString(),attr._type,attr._num,attr._delay);
 					}
+					GameDebug.Log(attr._attackID + " fight "+ attr._targetID + ":"+((Player.ENUM_SKILL_TYPE)attr._action).ToString()+":"+((Creature.ENUM_ATTR)attr._type).ToString()+":"+attr._num);
 				}
 				else if(pag.ID == (uint)JFPackage.MSG_ID.Error)
 				{
@@ -72,15 +102,15 @@ public class MSGProcess {
 					Map.position pos = new Map.position(create._x,create._z);
 					pos._dir = create._dir;
 					CreateSize++;
-					GameDebug.Log("CreateSize:"+CreateSize+":("+create._x+":"+create._z+")");
+					//GameDebug.Log("CreateSize:"+CreateSize+":("+create._x+":"+create._z+")");
 					string name = StringEncoding.GetString(create._name);
 					if(create._type == 0)  // hero
 					{
-						PlayerSys.getSingleton().createHero(create._id,pos,create._hp,name);
+						PlayerSys.getSingleton().createHero(create._id,pos,0,name);
 					}
 					else // others player
 					{
-						PlayerSys.getSingleton().getHero().NotifyAdd(create._type,create._id.ToString(),pos,create._hp,name);
+						PlayerSys.getSingleton().getHero().NotifyAdd(create._type,create._id.ToString(),pos,0,name);
 					}
 				}
 				else if((uint)JFPackage.MSG_ID.WALK == pag.ID)
@@ -94,6 +124,10 @@ public class MSGProcess {
 				{
 					JFPackage.PAG_FIGHT fight = (JFPackage.PAG_FIGHT)pag;
 					Player hero = PlayerSys.getSingleton().getHero();
+					if(fight._action == 8)
+					{
+						GameDebug.Log("BOSS 召唤了卫兵,请小心.");
+					}
 					//if(fight._id != PlayerSys.getSingleton().getHero().ID)
 					{
 						PlayerSys.getSingleton().getHero().NotifyFight(fight._id,fight._target,fight._action);

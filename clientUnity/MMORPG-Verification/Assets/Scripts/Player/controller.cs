@@ -6,7 +6,7 @@ public class controller : MonoBehaviour {
 	public GameObject player;
 
 	Map.position needMoveTo;
-	float speed = 2.0f;
+	float speed = 1.5f;
 	float f = 0;
 	Vector3 fromPos=Vector3.zero,toPos=Vector3.zero;
 	Map.Direction dir;

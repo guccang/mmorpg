@@ -19,7 +19,7 @@ public class Player : Creature {
 	GameObject mainCamera;
 	Map.position _island;
 
-	enum ENUM_SKILL_TYPE
+	public enum ENUM_SKILL_TYPE
 	{
 		SKILL_NORMAL=0,				// 普通攻击
 		SKILL_TRAIL=1,				  //  带拖尾的
@@ -87,13 +87,27 @@ public class Player : Creature {
 		_delayList.RemoveAll((o)=>{return o.delay<=0;});
 	}
 
+	public Creature getMater(float distance)
+	{
+		foreach(var v in _viewList.Values)
+		{
+			if(v.ID == ID) continue;
+			if(Vector3.Distance( v.gameObject.transform.position,this.gameObject.transform.position) <= distance)
+			{
+				return v;
+			}
+		}
+		return null;
+	}
+
 	void DrawCritical()
 	{
-		DrawGrahical.getSingleton().DrawCircle(transform.position.x,transform.position.z,9,this.gameObject);
+		DrawGrahical.getSingleton().DrawCircle(transform.position.x,transform.position.z,2,this.gameObject);
 	}
 	// Update is called once per frame
 	void Update () {
 		_ai.AutoMove();
+		_ai.AutoFight(Time.deltaTime);
 		DelayAttrAction((short)(Time.deltaTime*1000));
 		cameraMove();
 		DrawCritical();
@@ -202,7 +216,7 @@ public class Player : Creature {
 		chgTraget(c);
 	}
 
-	void chgTraget(Creature c)
+	public void chgTraget(Creature c)
 	{
 		if(c==null)
 		{
@@ -269,7 +283,7 @@ public class Player : Creature {
 		{
 				c.fight((short)action,c,t);
 		}
-		else if(2==action||3==action)
+		else if(2==action||3==action||4==action)
 		{
 			area ar = t.gameObject.GetComponent<area>();
 			if(null == ar)
@@ -321,7 +335,7 @@ public class Player : Creature {
 		Creature c= PlayerSys.getSingleton().createCreature(type,int.Parse(playerId),pos,hp,name);
 		_viewList.Add(c.ID.ToString(),c);
 	}
-	public void AttrInit(string id,int hp,int mp,int def)
+	public void AttrInit(string id,int maxHp,int maxMp,int hp,int mp,int def,int maxShiled,int shiled)
 	{
 		if(!Contain(id))
 		{
@@ -329,8 +343,11 @@ public class Player : Creature {
 			return;
 		}
 		Creature c = _viewList[id];
+		c.maxHp = maxHp;
+		c.maxMp = maxMp;
 		c.hp = hp;
 		c.mp = mp;
+		c.shiled = shiled;
 		c.def = def;
 		if(c.ID!=ID)
 			c.chgColor("normal");

@@ -13,7 +13,7 @@ public class Creature : MonoBehaviour
 		DYNCBLOCK=5,
 	}
 
-	enum ENUM_ATTR
+	public enum ENUM_ATTR
 	{
 		HP = 0,	
 		MP = 1,
@@ -26,6 +26,8 @@ public class Creature : MonoBehaviour
 	public string _name;
 	public int hp;
 	public int mp;
+	public int maxHp;
+	public int maxMp;
 	public int def;
 	public int shiled;
 	public string color;

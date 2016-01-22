@@ -67,6 +67,7 @@
      <Compile Include="Assets\Scripts\Toos\DrawGraphical.cs" />
      <Compile Include="Assets\Scripts\Toos\MousePickUp.cs" />
      <Compile Include="Assets\Scripts\Toos\Singleton.cs" />
+     <Compile Include="Assets\Scripts\Toos\hpBar.cs" />
      <Compile Include="Assets\Scripts\performance\NetPerformance.cs" />
      <Compile Include="Assets\Scripts\performance\localIO.cs" />
      <Compile Include="Assets\Scripts\test.cs" />

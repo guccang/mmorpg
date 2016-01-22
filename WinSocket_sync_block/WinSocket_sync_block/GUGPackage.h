@@ -23,6 +23,9 @@ namespace GUGGAME
 		MSGID_CREATE = 2002,
 		MSGID_DELETEOBJ = 2003,
 		MSGID_ENETRMAP = 2004,
+		MSG_ID_RELIVE = 2005,
+		MSG_ID_NOTIFY = 2006,
+		MSG_ID_KILLS = 2007,
 
 		// Login
 		MSGID_LOGIN = 3000,
@@ -40,6 +43,8 @@ namespace GUGGAME
 		ERROR_HAD_REGIST=6,
 		ERROR_FIGHT_TARGET_DEAD = 7,
 		ERROR_ENTER_MAP_NOT_LOGIN = 8,
+		ERROR_RELIVE_ERROR = 9,
+		ERROR_REGIST_FULL = 10,
 	};
 
 	const int HEAD_LEN = 4;
@@ -251,19 +256,21 @@ namespace GUGGAME
 		short action;
 		short parm01;
 		short parm02;
+		int order;
 		Fight()
 		{
 			no = 2001;
+			order = 0;
 		}
 	};
 	template<class T> inline T& operator<<(T& stream, const Fight& data)
 	{
-		stream << data.no << data.attackerID << data.targetID << data.action << data.parm01 << data.parm02;
+		stream << data.no << data.attackerID << data.targetID << data.action << data.parm01 << data.parm02 << data.order;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, Fight& data)
 	{
-		stream >> data.no >> data.attackerID >>  data.targetID >>data.action >> data.parm01 >> data.parm02;
+		stream >> data.no >> data.attackerID >>  data.targetID >>data.action >> data.parm01 >> data.parm02 >> data.order;
 		return stream;
 	}
 
@@ -295,23 +302,25 @@ namespace GUGGAME
 	struct Register
 	{
 		unsigned int no;
+		char bAuto;
 		char name[16];
 		char pwd[32];
 		Register()
 		{
 			no = 3001;
+			bAuto = false;
 		}
 	};
 	template<class T> inline T& operator<<(T& stream, const Register& data)
 	{
-		stream << data.no;
+		stream << data.no << data.bAuto;
 		strToStream(stream, data.name, 16);
 		strToStream(stream, data.pwd, 32);
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, Register& data)
 	{
-		stream >> data.no;
+		stream >> data.no >> data.bAuto;
 		streamToStr(stream, data.name, 16);
 		streamToStr(stream, data.pwd, 32);
 		return stream;
@@ -326,7 +335,6 @@ namespace GUGGAME
 		short x;
 		short z;
 		char  dir;
-		int   hp;
 		char  name[16];
 		CreateObj()
 		{
@@ -336,13 +344,13 @@ namespace GUGGAME
 	};
 	template<class T> inline T& operator<<(T& stream, const CreateObj& data)
 	{
-		stream << data.no << data.id << data.type << data.x << data.z << data.dir << data.hp;
+		stream << data.no << data.id << data.type << data.x << data.z << data.dir;
 		strToStream(stream, data.name, 16);
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, CreateObj& data)
 	{
-		stream >> data.no >> data.id >> data.type >> data.x >> data.z >> data.dir >> data.hp;
+		stream >> data.no >> data.id >> data.type >> data.x >> data.z >> data.dir;
 		streamToStr(stream, data.name, 16);
 		return stream;
 	}
@@ -392,10 +400,13 @@ namespace GUGGAME
 	struct AttrChg
 	{
 		unsigned int no;
-		int id;
+		int attackID;
+		int targetID;
+		short action; // skill id
 		short type;
 		short num;
 		short delay; // ms
+		int order;
 		AttrChg()
 		{
 			no = 1004;
@@ -404,12 +415,12 @@ namespace GUGGAME
 	};
 	template<class T> inline T& operator<<(T& stream, const AttrChg& data)
 	{
-		stream << data.no <<  data.id << data.type << data.num << data.delay;
+		stream << data.no <<  data.attackID << data.targetID << data.action << data.type << data.num << data.delay << data.order;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, AttrChg& data)
 	{
-		stream >> data.no >> >> data.id >> data.type >> data.num >> data.delay;
+		stream >> data.no >> data.attackID >> data.targetID >> data.action >> data.type >> data.num >> data.delay >> data.order;
 		return stream;
 	}
 
@@ -417,22 +428,28 @@ namespace GUGGAME
 	{
 		unsigned int no;
 		int id;
+		int maxhp;
+		int maxmp;
+		int maxShiled;
 		int hp;
 		int mp;
+		int shiled;
 		int def;
 		Attr()
 		{
 			no = 1005;
+			shiled = 0;
+			maxShiled = 3000;
 		}
 	};
 	template<class T> inline T& operator<<(T& stream, const Attr& data)
 	{
-		stream << data.no << data.id << data.hp << data.mp << data.def;
+		stream << data.no << data.id << data.maxhp << data.maxmp <<data.maxShiled <<data.hp << data.mp << data.shiled<<data.def;
 		return stream;
 	}
 	template<class T> inline T& operator>>(T& stream, Attr& data)
 	{
-		stream >> data.no >> >> data.id >> data.hp >> data.mp >> data.def;
+		stream >> data.no >> >> data.id >>data.maxhp>>data.maxmp>> data.maxShiled>> data.hp >> data.mp >> data.shiled>>data.def;
 		return stream;
 	}
 
@@ -502,6 +519,106 @@ namespace GUGGAME
 	template<class T> inline T& operator>>(T& stream, EnterMap& data)
 	{
 		stream >> data.no >> data.mapID;
+		return stream;
+	}
+
+	struct reLive
+	{
+		unsigned int no;
+		reLive()
+		{
+			no = MSG_ID_RELIVE;
+		}
+	};
+	template<class T> inline T& operator<<(T& stream, const reLive& data)
+	{
+		stream << data.no;
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, reLive& data)
+	{
+		stream >> data.no;
+		return stream;
+	}
+
+	struct Notify
+	{
+		unsigned int no;
+		char type;
+		char attack[16];
+		char target[16];
+		Notify()
+		{
+			no = MSG_ID_NOTIFY;
+			type = 0;
+			attack[0] = 0;
+			target[0] = 0;
+		}
+	};
+	template<class T> inline T& operator<<(T& stream, const Notify& data)
+	{
+		stream << data.no << data.type;
+		strToStream(stream, data.attack, 16);
+		strToStream(stream, data.target, 16);
+
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, Notify& data)
+	{
+		stream >> data.no >> data.type ;
+		streamToStr(stream, data.attack, 16);
+		streamToStr(stream, data.target, 16);
+		return stream;
+	}
+
+	struct killedBeKillData
+	{
+		int id;
+		short killed;
+		short beKilled;
+		char name[16];
+	};
+	template<class T> inline T& operator<<(T& stream, const killedBeKillData& data)
+	{
+		stream << data.id << data.killed << data.beKilled;
+		strToStream(stream, data.name, 16);
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, killedBeKillData& data)
+	{
+		stream >> data.id >> data.killed >> data.beKilled;
+		streamToStr(stream, data.name, 16);
+		return stream;
+	}
+	struct ListOfKills
+	{
+		unsigned int no;
+		unsigned int size;
+		killedBeKillData data[10];
+
+		ListOfKills()
+		{
+			no = MSG_ID_KILLS;
+			size = 0;
+		}
+
+	};
+	template<class T> inline T& operator<<(T& stream, const ListOfKills& data)
+	{
+		stream << data.no << data.size;
+		for (int i = 0; i < (int)data.size; ++i)
+		{
+			stream << data.data[i];
+		}
+		return stream;
+	}
+	template<class T> inline T& operator>>(T& stream, ListOfKills& data)
+	{
+		stream >> data.no >> data.size;
+		for (int i = 0; i < (int)data.size; ++i)
+		{
+			stream >> data.data[i];
+		}
 		return stream;
 	}
 #pragma pack(pop)
